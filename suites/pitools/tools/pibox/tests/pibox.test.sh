@@ -36,6 +36,16 @@ assert_record_has() {
   done
   fail "$2\n  recorder has no literal token [$1]"
 }
+assert_record_lacks() {
+  local token
+  for token in "${RECORDED[@]}"; do
+    if [ "$token" = "$1" ]; then
+      fail "$2\n  recorder unexpectedly contains literal token [$1]"
+      return
+    fi
+  done
+  pass
+}
 assert_record_lacks_fragment() {
   local token
   for token in "${RECORDED[@]}"; do
@@ -91,6 +101,7 @@ printf '#!/usr/bin/env bash\n' >"$unsupported"
 chmod +x "$unsupported"
 
 TEST_HOME="$SANDBOX/home"
+PI_HOME_STATE="$TEST_HOME/.pi"
 PI_STATE="$SANDBOX/pi agent state"
 REPO="$SANDBOX/project alpha"
 mkdir -p "$TEST_HOME" "$PI_STATE" "$REPO"
@@ -189,6 +200,11 @@ run_launch "$RECORD_NO_AUTH" env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY >/dev/nu
 launch_rc=$?
 set -e
 assert_zero "$launch_rc" 'launch does not gate on one particular authentication method'
+if [ -d "$PI_HOME_STATE" ]; then
+  pass
+else
+  fail 'launch creates missing Pi home state as the host user before mounting it'
+fi
 mapfile -t RECORDED <"$RECORD_NO_AUTH"
 assert_record_has '--runtime=sysbox-runc' 'launch isolation requires sysbox'
 assert_record_sequence 'launch marker is present' -e 'PIBOX=1'
@@ -197,7 +213,10 @@ assert_record_sequence 'launch state environment uses path-identical agent dir' 
 assert_record_sequence 'launch suppresses in-box host-version checks' -e 'PI_SKIP_VERSION_CHECK=1'
 assert_record_sequence 'launch project mount and workdir are path-identical' \
   -v "$REPO:$REPO" -w "$REPO"
-assert_record_sequence 'launch Pi state is writable and persistent' -v "$PI_STATE:$PI_STATE"
+assert_record_sequence 'launch complete Pi home state is writable and persistent' \
+  -v "$PI_HOME_STATE:$PI_HOME_STATE"
+assert_record_sequence 'launch external custom agent state is writable and persistent' \
+  -v "$PI_STATE:$PI_STATE"
 assert_record_sequence 'launch npm installation is read-only' -v "$npm_pkg:$npm_pkg:ro"
 assert_record_sequence 'launch Git identity is read-only' -v "$TEST_HOME/.gitconfig:$TEST_HOME/.gitconfig:ro"
 assert_record_sequence 'launch inner-Docker data is project-specific' \
@@ -221,7 +240,35 @@ mapfile -t RECORDED <"$RECORD_AUTH"
 assert_record_sequence 'OpenAI credential preserves argument boundary' -e 'OPENAI_API_KEY=api key value'
 assert_record_sequence 'Anthropic credential preserves argument boundary' -e 'ANTHROPIC_API_KEY=anthropic value'
 
-# A custom session directory outside agent state needs its own identical mount.
+# The default agent directory is already covered by the complete ~/.pi mount.
+DEFAULT_PI_AGENT="$PI_HOME_STATE/agent"
+mkdir -p "$DEFAULT_PI_AGENT"
+PI_AGENT_DIR="$DEFAULT_PI_AGENT"
+build_docker_args "$REPO" npm "$npm_pkg/dist/bundle/cli.js" "$npm_pkg"
+RECORDED=("${DOCKER_ARGS[@]}")
+assert_record_sequence 'default agent environment remains path-identical' \
+  -e "PI_CODING_AGENT_DIR=$DEFAULT_PI_AGENT"
+assert_record_sequence 'default agent state is covered by the complete Pi home mount' \
+  -v "$PI_HOME_STATE:$PI_HOME_STATE"
+assert_record_lacks "$DEFAULT_PI_AGENT:$DEFAULT_PI_AGENT" \
+  'default agent state does not receive a redundant nested mount'
+# shellcheck disable=SC2034 # consumed by sourced build_docker_args on later calls
+PI_AGENT_DIR="$PI_STATE"
+
+# A custom session directory under ~/.pi is already covered by the complete mount.
+PI_HOME_SESSIONS="$PI_HOME_STATE/package sessions"
+mkdir -p "$PI_HOME_SESSIONS"
+PI_SESSION_DIR="$PI_HOME_SESSIONS"
+build_docker_args "$REPO" npm "$npm_pkg/dist/bundle/cli.js" "$npm_pkg"
+RECORDED=("${DOCKER_ARGS[@]}")
+assert_record_sequence 'custom session environment under Pi home is preserved' \
+  -e "PI_CODING_AGENT_SESSION_DIR=$PI_HOME_SESSIONS"
+assert_record_lacks "$PI_HOME_SESSIONS:$PI_HOME_SESSIONS" \
+  'custom sessions under Pi home do not receive a redundant nested mount'
+# shellcheck disable=SC2034 # consumed by sourced build_docker_args on later calls
+PI_SESSION_DIR=''
+
+# A custom session directory outside complete Pi and agent state needs its own identical mount.
 CUSTOM_SESSIONS="$SANDBOX/custom sessions"
 mkdir -p "$CUSTOM_SESSIONS"
 PI_SESSION_DIR="$CUSTOM_SESSIONS"

@@ -82,11 +82,13 @@ Run it first only when intentionally removing box artifacts too.
 - `pisession` retains Pi header, name, message, model-change, and version parsing.
 - `pibox` does not invent or pass a bypass flag; the entire Pi process runs in
   the sysbox-backed container.
-- It mounts `PI_CODING_AGENT_DIR` and, when needed, a custom
-  `PI_CODING_AGENT_SESSION_DIR`, retaining the original mount and provider-env
-  allowlist behavior. The host installation is mounted read-only.
+- It mounts the complete host `$HOME/.pi` read-write so core state and
+  package-owned sibling directories persist. A custom `PI_CODING_AGENT_DIR` or
+  `PI_CODING_AGENT_SESSION_DIR` outside that tree receives its own path-identical
+  mount. The provider-env allowlist remains narrow, and the host installation is
+  mounted read-only.
 
-Projects and agent state are writable. Read the
+Projects and all host state under `$HOME/.pi` are writable. Read the
 [security model](tools/pibox/README.md#security-model) before use.
 
 ## Development and releases

@@ -2,7 +2,8 @@
 
 PIBOX_VERSION="1.0.0"
 IMAGE="${PIBOX_IMAGE:-pibox:latest}"
-PI_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+PI_HOME_DIR="$HOME/.pi"
+PI_AGENT_DIR="${PI_CODING_AGENT_DIR:-$PI_HOME_DIR/agent}"
 PI_SESSION_DIR="${PI_CODING_AGENT_SESSION_DIR:-}"
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 DEFAULT_PORTS="3000-3010"
@@ -43,8 +44,9 @@ Usage:
 The first word decides: one of {build, doctor, uninstall, help, version} runs that
 command; anything else is passed unchanged to Pi inside the sandbox.
 
-The box runs as your host user, mounts the project and Pi agent state read-write
-at their real paths, and mounts the exact host Pi installation read-only. Pi
+The box runs as your host user, mounts the project and all of \$HOME/.pi read-write
+at their real paths, and mounts the exact host Pi installation read-only. Custom
+agent or session directories outside \$HOME/.pi are also mounted read-write. Pi
 already runs tools with all permissions; Docker with sysbox-runc is the external
 security boundary.
 
@@ -316,14 +318,19 @@ build_docker_args() { # <repo-root> <kind> <pi-exec> <mount-source>
     -e "PI_CODING_AGENT_DIR=$PI_AGENT_DIR"
     -e "PI_SKIP_VERSION_CHECK=1"
     -v "$repo_root:$repo_root" -w "$repo_root"
-    -v "$PI_AGENT_DIR:$PI_AGENT_DIR"
+    -v "$PI_HOME_DIR:$PI_HOME_DIR"
     -v "$mount_source:$mount_source:ro"
     -v "pibox-docker-$project:/var/lib/docker")
+
+  case "$PI_AGENT_DIR" in
+    "$PI_HOME_DIR" | "$PI_HOME_DIR"/*) ;;
+    *) DOCKER_ARGS+=(-v "$PI_AGENT_DIR:$PI_AGENT_DIR") ;;
+  esac
 
   if [ -n "$PI_SESSION_DIR" ]; then
     DOCKER_ARGS+=(-e "PI_CODING_AGENT_SESSION_DIR=$PI_SESSION_DIR")
     case "$PI_SESSION_DIR" in
-      "$PI_AGENT_DIR" | "$PI_AGENT_DIR"/*) ;;
+      "$PI_HOME_DIR" | "$PI_HOME_DIR"/* | "$PI_AGENT_DIR" | "$PI_AGENT_DIR"/*) ;;
       *) DOCKER_ARGS+=(-v "$PI_SESSION_DIR:$PI_SESSION_DIR") ;;
     esac
   fi
@@ -423,6 +430,10 @@ main() {
   if [ -n "$PI_SESSION_DIR" ] && [ ! -d "$PI_SESSION_DIR" ]; then
     echo "pibox: Pi session directory '$PI_SESSION_DIR' does not exist." >&2
     echo "pibox: create it before launching pibox." >&2
+    return 1
+  fi
+  if ! mkdir -p "$PI_HOME_DIR"; then
+    echo "pibox: cannot create Pi home state directory '$PI_HOME_DIR'." >&2
     return 1
   fi
 

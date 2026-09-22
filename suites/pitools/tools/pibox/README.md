@@ -23,24 +23,25 @@ The mounted project is real and writable. Run pibox from a Git repository whenev
 
 ## Security model
 
-The intended blast radius is narrow but real: Pi can fully change the mounted project, mounted Pi agent state, dependency caches, and per-project inner-Docker data.
+The intended blast radius is narrow but real: Pi can fully change the mounted project, all host Pi state under `$HOME/.pi`, dependency caches, and per-project inner-Docker data.
 
 - Docker runs with `--runtime=sysbox-runc`. Sysbox user-namespace isolation is the intended security boundary.
-- The selected project and `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}` are mounted read-write at path-identical locations. A custom `PI_CODING_AGENT_SESSION_DIR` outside agent state receives its own path-identical mount.
+- The selected project and the complete `$HOME/.pi` directory are mounted read-write at path-identical locations. This preserves core agent state plus package-owned sibling directories such as `~/.pi/context-mode`, including directories created by packages installed later.
+- A custom `PI_CODING_AGENT_DIR` outside `$HOME/.pi` receives its own read-write path-identical mount. A custom `PI_CODING_AGENT_SESSION_DIR` is mounted separately only when it is outside both `$HOME/.pi` and agent state.
 - The resolved host Pi installation is mounted read-only. Supported layouts are the current `@earendil-works/pi-coding-agent` npm package and an official compiled Pi directory with adjacent runtime assets.
 - The host Docker socket is never mounted, and pibox does not use privileged mode or host networking. Docker available inside the box is an isolated inner daemon with project-specific storage.
 - Host SSH and GitHub CLI credentials are not mounted. A read-only `.gitconfig` provides commit identity but no push credential.
 - Provider credentials in Pi's mounted `auth.json` can be refreshed in place. pibox also forwards only an explicit allowlist of supported provider environment variables; it never forwards the entire host environment.
 - There is no network-egress firewall or kernel-escape protection. Treat the project and Pi state as intentionally writable, review the boundary, and use pibox only where that tradeoff is acceptable.
 
-Mounting host agent state exposes authentication, settings, packages, sessions, and any installed extension code to the container. Extensions run with the same in-box authority as Pi. If you want isolated state instead, set `PI_CODING_AGENT_DIR` to a dedicated host directory before running both `pibox doctor` and `pibox`.
+Mounting the complete host `$HOME/.pi` exposes authentication, settings, packages, sessions, extension code, package-specific databases, caches, and any future state stored there. Extensions run with the same in-box authority as Pi. This broad writable mount is intentional: it preserves the complete host Pi environment rather than maintaining an allowlist that becomes incomplete as packages add state directories. Setting `PI_CODING_AGENT_DIR` elsewhere does not remove `$HOME/.pi` from the boundary.
 
 ## Prerequisites
 
 1. **Docker:** `docker --version` works without sudo, and `docker info -f '{{.Runtimes}}'` lists `sysbox-runc`.
 2. **sysbox:** install and configure sysbox-ce for Docker. No fallback runtime is accepted.
 3. **Host Pi:** `pi` is on `PATH` and comes from `@earendil-works/pi-coding-agent` or an official compiled directory. pibox mounts this installation instead of baking in a second version.
-4. **Pi state:** run Pi on the host so `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}` exists. Create a configured custom `PI_CODING_AGENT_SESSION_DIR` before launch.
+4. **Pi state:** run Pi on the host so `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}` exists. pibox creates `$HOME/.pi` as the host user if needed, mounts it completely, and also mounts configured custom agent or session directories when they live outside it.
 5. **Authentication:** use `/login` in host Pi so `auth.json` contains provider state, or export a supported provider credential. `pibox doctor` reports an empty auth configuration, but launch does not gate on one auth method because Pi also supports local/custom providers.
 
 ## Build and install

@@ -130,7 +130,7 @@ container helper extraction can happen independently, without a big rewrite.
 
 The Claude image retains its distinct recipe. The Codex/Pi recipe is shared,
 but their images, entrypoints, credentials and Docker volumes are not merged.
-Read each box's security model before use: host project and agent state mounts
+Read each box's security model before use: host project and harness state mounts
 are writable; a container is not a guarantee against all harmful actions.
 
 ## Development
