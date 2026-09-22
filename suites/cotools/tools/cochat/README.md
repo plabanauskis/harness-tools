@@ -5,7 +5,7 @@
   <img src="assets/logo.svg" alt="cochat" width="300">
 </picture>
 
-<p><strong>A throwaway Codex chat, in one command.</strong></p>
+<p><strong>Start a Codex chat in a temporary directory.</strong></p>
 
 <p>
   <a href="../../LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-555"></a>
@@ -15,31 +15,33 @@
 
 </div>
 
-Open Codex in a fresh temporary directory when a question does not belong in a project. `cochat` creates `${TMPDIR:-/tmp}/cochat.XXXXXX`, changes into it, and starts Codex; the shell you launched it from keeps its current directory.
-
-The directory is intentionally retained. That lets its Codex session remain discoverable by `cosession` until the directory is removed (many systems clear `/tmp` at reboot). Remove it yourself when it is no longer useful.
+Use `cochat` for questions that do not belong to a project. It creates a temporary
+directory, changes into it, and starts Codex without changing the working
+directory of the shell that launched it.
 
 ## Requirements
 
-- The `codex` command on `PATH`.
-- Linux or macOS.
+- `codex` on `PATH`
+- Linux or macOS
 
 ## Install
 
-`cochat` is part of the [cotools](../../README.md) bundle:
+Enable it from the [cotools](../../README.md) suite:
 
 ```bash
 cotools enable cochat
 ```
 
-Or select it during the root `install.sh` flow.
-
 ## Usage
 
 ```bash
 cochat                       # start in a new temporary directory
-cochat --model gpt-5         # pass arguments through to codex unchanged
-cochat --help                # show cochat help without launching Codex
+cochat --model gpt-5         # pass arguments to Codex unchanged
+cochat --help                # show cochat help
 ```
 
-All arguments after `cochat` pass through unchanged to `codex`. To find a retained chat later, run `cosession` and select its temporary-directory row.
+## Saved sessions
+
+The directory is created under `${TMPDIR:-/tmp}` and remains after the command
+ends. This keeps the conversation available to `cosession` until the directory
+is removed, often at reboot.

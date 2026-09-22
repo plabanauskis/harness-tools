@@ -8,15 +8,14 @@
 
 # pitools
 
-Three focused Pi terminal helpers, now maintained in the
-[harness-tools monorepo](../../README.md). Shared installation and management code;
-Pi-specific session and container behavior.
+Three Pi terminal tools maintained in the
+[harness-tools monorepo](../../README.md).
 
-| Tool | Purpose | Dependencies | Platform |
+| Tool | Purpose | Requires | Platform |
 | --- | --- | --- | --- |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="tools/pichat/assets/icon-dark.svg"><img src="tools/pichat/assets/icon.svg" alt="" width="20" height="20"></picture> [pichat](tools/pichat/README.md) | Throwaway chat in a fresh temporary directory | `pi` | Linux, macOS |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="tools/pisession/assets/icon-dark.svg"><img src="tools/pisession/assets/icon.svg" alt="" width="20" height="20"></picture> [pisession](tools/pisession/README.md) | fzf session picker and resume | `fzf`, `jq`, `pi` | Linux, macOS |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="tools/pibox/assets/icon-dark.svg"><img src="tools/pibox/assets/icon.svg" alt="" width="20" height="20"></picture> [pibox](tools/pibox/README.md) | Pi in Docker + sysbox | `docker`, `sysbox-runc`, `pi` | Linux amd64 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="tools/pichat/assets/icon-dark.svg"><img src="tools/pichat/assets/icon.svg" alt="" width="20" height="20"></picture> [pichat](tools/pichat/README.md) | Start a chat in a temporary directory | `pi` | Linux, macOS |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="tools/pisession/assets/icon-dark.svg"><img src="tools/pisession/assets/icon.svg" alt="" width="20" height="20"></picture> [pisession](tools/pisession/README.md) | Find and resume sessions with fzf | `fzf`, `jq`, `pi` | Linux, macOS |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="tools/pibox/assets/icon-dark.svg"><img src="tools/pibox/assets/icon.svg" alt="" width="20" height="20"></picture> [pibox](tools/pibox/README.md) | Run Pi in a sysbox container | `docker`, `sysbox-runc`, `pi` | Linux amd64 |
 
 ## Install
 
@@ -26,36 +25,19 @@ Requires Bash, Git, and curl. No GitHub account or sudo is needed:
 curl -fsSL https://raw.githubusercontent.com/plabanauskis/harness-tools/main/install.sh | bash -s -- --suite=pitools
 ```
 
-Append `--tools=pichat,pisession` to enable only those tools. To inspect first:
+Add `--tools=pichat,pisession` to select tools directly, `--all` for all three,
+or `--force` to keep links when a requirement check fails. From a complete
+source checkout, you can instead run `bash suites/pitools/install.sh`.
+
+For a development install from committed local files:
 
 ```bash
-curl -fsSL -o install.sh https://raw.githubusercontent.com/plabanauskis/harness-tools/main/install.sh
-less install.sh
-bash install.sh --suite=pitools --tools=pichat,pisession
-```
-
-Or run `bash suites/pitools/install.sh` from the monorepo root for the interactive
-picker. `--all` selects the suite; `--force` overrides missing dependencies and
-platform checks. Selecting the lightweight tools never builds a Docker image.
-
-For a local development install from the monorepo root:
-
-```bash
-git clone https://github.com/plabanauskis/harness-tools.git
-cd harness-tools
 PITOOLS_REPO="file://$PWD" bash install.sh --suite=pitools --tools=pichat
 ```
 
-The local checkout must contain the desired committed files on `main`, or set
-`PITOOLS_BRANCH`. A local install continues to update from that local repository.
+Set `PITOOLS_BRANCH` if the desired commit is not on `main`.
 
-## Installation and management
-
-- `~/.local/share/pitools` is a complete monorepo clone; override `PITOOLS_HOME`.
-- `~/.local/bin` holds the enabled links plus `pitools`; override `PITOOLS_BIN`.
-- `PITOOLS_REPO` and `PITOOLS_BRANCH` select the upstream for a fresh clone.
-- Existing clones update their configured Git upstream. Keep custom HOME/BIN
-  overrides exported for management commands.
+## Manage tools
 
 ```bash
 pitools list
@@ -67,37 +49,30 @@ pitools version [tool]
 pitools uninstall
 ```
 
-`pitools update` fetches and prunes, then hard-resets a clean managed clone to its
-upstream. It refuses tracked local changes. Update and uninstall refuse a source
-checkout or another suite's prefix. Uninstall prompts and removes only its owned
-symlinks and clone, not harness state or Docker artifacts.
+The default install directory is `~/.local/share/pitools`; override it with
+`PITOOLS_HOME`. Commands are linked in `~/.local/bin`; override that with
+`PITOOLS_BIN`. `PITOOLS_REPO` and `PITOOLS_BRANCH` select the source for a new
+install.
 
-For an old installation, follow the [migration guide](../../docs/migration.md).
-Do not run `pibox uninstall` merely to migrate; preserve its images and volumes.
-Run it first only when intentionally removing box artifacts too.
+`update` refuses tracked local changes, fetches and prunes its source, then
+resets the managed clone. Uninstall removes owned links and the clone, but not
+Pi state or Docker data. Follow the [migration guide](../../docs/migration.md) for an
+installation from the old separate repository.
 
-## Pi-specific behavior and security
+## Safety
 
-- Sessions are JSONL trees under `${PI_CODING_AGENT_SESSION_DIR:-${PI_CODING_AGENT_DIR:-~/.pi/agent}/sessions}`.
-- `pisession` retains Pi header, name, message, model-change, and version parsing.
-- `pibox` does not invent or pass a bypass flag; the entire Pi process runs in
-  the sysbox-backed container.
-- It mounts the complete host `$HOME/.pi` read-write so core state and
-  package-owned sibling directories persist. A custom `PI_CODING_AGENT_DIR` or
-  `PI_CODING_AGENT_SESSION_DIR` outside that tree receives its own path-identical
-  mount. The provider-env allowlist remains narrow, and the host installation is
-  mounted read-only.
-
-Projects and all host state under `$HOME/.pi` are writable. Read the
-[security model](tools/pibox/README.md#security-model) before use.
+Pi already runs tools with full permissions; pibox does not add a bypass option.
+It runs the whole Pi process in a sysbox container. The project and all host
+state under `$HOME/.pi` are writable. Custom `PI_CODING_AGENT_DIR` and
+`PI_CODING_AGENT_SESSION_DIR` paths outside that directory are also mounted when
+configured. Read [what pibox can change](tools/pibox/README.md#safety) before use.
 
 ## Development and releases
 
-From the monorepo root, `scripts/check.sh` checks all suites;
-`scripts/dev-setup.sh` enables the optional root pre-push hook.
-`scripts/release.sh <tool> <version>` creates per-tool `<tool>-vX.Y.Z` tags.
-See the [root release documentation](../../README.md#development).
+From the repository root, run `scripts/check.sh`. Use
+`scripts/release.sh <tool> <version>` to prepare a tool release. See the
+[root development guide](../../README.md#development-and-releases).
 
-[MIT](LICENSE). Portions of the box design adapted from
-[RchGrav/claudebox](https://github.com/RchGrav/claudebox) (MIT).
-This project is independent of the Pi maintainers and Earendil Works.
+[MIT](LICENSE). pibox includes work adapted from
+[RchGrav/claudebox](https://github.com/RchGrav/claudebox). This project is
+independent of the Pi maintainers and Earendil Works.

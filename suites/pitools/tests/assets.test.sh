@@ -41,20 +41,20 @@ need_text README.md 'curl -fsSL https://raw.githubusercontent.com/plabanauskis/h
 need_text README.md 'bash install.sh --suite=pitools'
 need_text README.md 'No GitHub account or sudo is needed'
 need_text README.md "PITOOLS_REPO=\"file://\$PWD\""
-need_text README.md 'fetches and prunes, then hard-resets'
+need_text README.md 'fetches and prunes its source'
 need_text README.md 'PI_CODING_AGENT_DIR'
 need_text README.md 'PI_CODING_AGENT_SESSION_DIR'
-need_text README.md 'does not invent or pass a bypass flag'
+need_text README.md 'does not add a bypass option'
 need_text tools/pichat/README.md '--no-session'
 need_text tools/pisession/README.md 'pi --session <file>'
 need_text tools/pisession/README.md 'PI_CODING_AGENT_SESSION_DIR'
 need_text tools/pisession/README.md "\$HOME/.pi/agent"
-need_text tools/pibox/README.md 'never mounted'
-need_text tools/pibox/README.md 'narrow the blast radius'
+need_text tools/pibox/README.md 'host Docker socket'
+need_text tools/pibox/README.md 'mounts from mistakes or malicious commands'
 need_text tools/pibox/README.md '@earendil-works/pi-coding-agent'
 need_text tools/pibox/README.md 'PIBOX_SHARE_DIR'
-need_text tools/pibox/README.md 'explicit allowlist'
-need_text tools/pibox/README.md 'no approval-bypass or sandbox-bypass option'
+need_text tools/pibox/README.md 'forwards a fixed list of provider'
+need_text tools/pibox/README.md 'add an approval or sandbox bypass option'
 
 # Catch accidental Codex-port residue in active source/docs/assets. Tests are
 # excluded because some deliberately assert forbidden strings are absent.

@@ -1,8 +1,8 @@
 # Changelog — cochat
 
-All notable changes to cochat are documented here. Versions follow [semver](https://semver.org).
+Notable changes to cochat. Releases follow [Semantic Versioning](https://semver.org).
 
 ## 1.0.0 — 2026-08-26
 
-- Initial release as a standalone script. Opens Codex in a fresh retained
-  ephemeral temp dir, supports `--help`, and passes arguments unchanged.
+- Start Codex in a new retained temporary directory.
+- Support `--help` and pass other arguments to Codex unchanged.

@@ -5,7 +5,7 @@
   <img src="assets/logo.svg" alt="pisession" width="400">
 </picture>
 
-<p><strong>Find and resume any Pi session — no <code>cd</code> required.</strong></p>
+<p><strong>Find and resume Pi sessions without changing directories first.</strong></p>
 
 <p>
   <a href="../../LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-555"></a>
@@ -15,9 +15,11 @@
 
 </div>
 
-`pisession` scans saved Pi JSONL sessions across all working directories and presents them in an [`fzf`](https://github.com/junegunn/fzf) picker, newest-active first. Choose a live row and it changes to the recorded directory before running `pi --session <file>`.
-
-Pi already provides `pi -r` and `/resume` for the current project. `pisession` complements that picker with a single global view.
+`pisession` lists saved Pi sessions in an
+[`fzf`](https://github.com/junegunn/fzf) picker, newest first. Selecting a live
+session changes to its recorded directory and runs `pi --session <file>`.
+Pi's own `pi -r` and `/resume` commands remain useful within one project;
+`pisession` provides a global list.
 
 ## Picker
 
@@ -31,11 +33,20 @@ Pi already provides `pi -r` and `/resume` for the current project. `pisession` c
   ✗  yesterday   ~/…/old-project                         google/gemini-3-pro   Fix checkout tests
 ```
 
-The right-hand preview shows directory status, model, Pi session format version, active time, session ID, and summary. `●` means the original directory is present. `✗` means it is gone; the row remains visible as history but cannot be resumed.
+The preview shows status, model, Pi session version, active time, session ID, and
+summary. `●` means the original directory exists. `✗` means it is gone; the row
+remains visible but cannot be resumed.
 
-## Requirements and install
+## Requirements
 
-`pisession` needs `fzf`, `jq`, and `pi` on `PATH`. It supports Linux and macOS and uses each platform's standard `date` and `stat` forms.
+- `fzf`, `jq`, and `pi` on `PATH`
+- Linux or macOS
+
+The script supports each platform's standard `date` and `stat` commands.
+
+## Install
+
+Enable it from the [pitools](../../README.md) suite:
 
 ```bash
 pitools enable pisession
@@ -44,7 +55,7 @@ pitools enable pisession
 ## Usage
 
 ```bash
-pisession          # open the global picker
+pisession          # open the picker
 pisession --help   # show help
 ```
 
@@ -52,30 +63,29 @@ Type to filter, use Up/Down to select, Enter to resume, or Escape to cancel.
 
 ## Session discovery
 
-The default session root is:
+The default session directory is:
 
 ```text
 ${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/sessions
 ```
 
-`PI_CODING_AGENT_SESSION_DIR` overrides that location, matching Pi's own precedence. `pisession` recursively finds `*.jsonl`, then includes only files with a valid Pi session header containing a UUID, working directory, and numeric format version.
-
-Each row comes directly from Pi's documented session format:
+`PI_CODING_AGENT_SESSION_DIR` overrides it. `pisession` recursively finds JSONL
+files with a valid Pi session header and skips malformed or unrelated files.
 
 | Display field | Source |
 | --- | --- |
-| ID, directory, format | `type: "session"` header |
-| Model | latest `model_change`, otherwise latest assistant provider/model |
-| Active | session file modification time |
-| Summary | latest non-empty `session_info.name`; otherwise first user text; otherwise ID |
-| Status | whether the recorded working directory exists |
+| ID, directory, version | `type: "session"` header |
+| Model | latest `model_change`; otherwise latest assistant provider/model |
+| Active | file modification time |
+| Summary | latest `session_info.name`; then first user text; then ID |
+| Status | whether the recorded directory exists |
 
-Malformed JSONL and unrelated exports are skipped. Summaries are normalized to one delimiter-safe line. On resume, the exact file path is passed to Pi rather than relying on a partial ID.
+The exact file path is passed to Pi when resuming.
 
 ## Tests
 
-```bash
-bash tools/pisession/tests/pisession.test.sh
-```
+From the repository root:
 
-The suite builds synthetic v2/v3, named, unnamed, live, gone, and malformed Pi sessions and verifies parsing, ordering, previews, Linux/macOS utility behavior, and the `pi --session` launch boundary.
+```bash
+bash suites/pitools/tools/pisession/tests/pisession.test.sh
+```

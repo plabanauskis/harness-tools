@@ -53,16 +53,16 @@ need_text README.md 'curl -fsSL https://raw.githubusercontent.com/plabanauskis/h
 need_text README.md 'bash install.sh --suite=cotools'
 need_text README.md 'No GitHub account or sudo is needed'
 need_text README.md 'not affiliated with or endorsed by OpenAI'
-need_text README.md 'fetches and prunes, then hard-resets'
+need_text README.md 'fetches and prunes its source'
 need_text README.md 'COTOOLS_REPO'
 need_text README.md 'COTOOLS_BRANCH'
 need_text tools/cosession/README.md 'CODEX_HOME'
 need_text tools/cosession/README.md "\$HOME/.codex"
 need_text tools/cobox/README.md '--dangerously-bypass-approvals-and-sandbox'
-need_text tools/cobox/README.md 'never mounts the host Docker socket'
-need_text tools/cobox/README.md 'narrow the blast radius'
-need_text tools/cobox/README.md 'does not mount the host OS keyring'
-need_text tools/cobox/README.md 'usable file-backed state'
+need_text tools/cobox/README.md 'the host Docker socket'
+need_text tools/cobox/README.md 'mounts from mistakes or malicious commands'
+need_text tools/cobox/README.md 'keyring is not mounted'
+need_text tools/cobox/README.md 'container needs file-based state'
 need_text tools/cobox/README.md 'COBOX_SHARE_DIR'
 
 # Do not let the active source and public docs regress to the prior suite's

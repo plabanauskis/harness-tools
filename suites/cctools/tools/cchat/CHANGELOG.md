@@ -1,9 +1,9 @@
 # Changelog — cchat
 
-All notable changes to cchat are documented here. Versions follow [semver](https://semver.org).
+Notable changes to cchat. Releases follow [Semantic Versioning](https://semver.org).
 
 ## 1.0.0 — 2026-06-24
 
-- Initial release as a standalone script in the cctools bundle (converted from a
-  `~/.zshrc` shell function). Opens Claude Code in a fresh ephemeral temp dir;
-  `--help` supported; args pass straight through to `claude`.
+- Replace the original `~/.zshrc` function with a standalone cctools script.
+- Start Claude Code in a new temporary directory, support `--help`, and pass
+  other arguments to `claude` unchanged.

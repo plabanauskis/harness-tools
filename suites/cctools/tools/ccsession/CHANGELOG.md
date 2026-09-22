@@ -1,10 +1,10 @@
 # Changelog — ccsession
 
-All notable changes to ccsession are documented here. Versions follow [semver](https://semver.org).
+Notable changes to ccsession. Releases follow [Semantic Versioning](https://semver.org).
 
 ## 1.0.0 — 2026-06-24
 
-- Initial release in the cctools bundle. `fzf` picker over all Claude Code
-  sessions (newest-active first) with a boxed preview card; Enter `cd`s into the
-  session's directory and runs `claude --resume <id>`. Dependency-free bash test
-  suite included.
+- Add an fzf picker for all Claude Code sessions, sorted by recent activity.
+- Show session details in a preview and resume the selection from its original
+  directory with `claude --resume <id>`.
+- Add a dependency-free Bash test suite.

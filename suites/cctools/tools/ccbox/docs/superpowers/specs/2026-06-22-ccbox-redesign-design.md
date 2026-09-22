@@ -1,181 +1,137 @@
-# ccbox redesign — "path-identical mirror" sandbox
+# ccbox redesign: use host paths inside the container
 
 **Date:** 2026-06-22
+
 **Status:** Approved design (pre-implementation)
-**Supersedes:** the original `ccbox-implementation-plan.md` "Settled Decisions" 5, 6, and the
-container-user / workspace-path choices.
 
----
+**Supersedes:** decisions 5 and 6 in the original `ccbox-implementation-plan.md`,
+plus its container-user and workspace-path choices.
 
-## 1. Goal & threat model
+> This is a historical design record. See the tool README for current behavior.
 
-Run Claude Code on the host machine inside an isolated container whose **only** job is to
-protect the **host system** from changes — so the agent can run fully autonomous
-(`--dangerously-skip-permissions`) with total freedom and still not be able to damage the
-host OS.
+## 1. Goal and limits
 
-The threat model is **one-directional and narrow**:
+Run Claude Code with `--dangerously-skip-permissions` in a container that prevents
+normal commands from changing the host operating system.
 
-- **Protect:** the host *system* layer — OS, installed packages, `/usr`, `/etc`, `/var`,
-  system services, and anything **outside the explicit mounts** below.
-- **Explicitly NOT in scope** (decided by the user):
-  - Protecting *other* git repos or the GitHub account from the agent.
-  - Restricting the agent's reach to external services / network egress.
-  - Kernel-escape protection (the workloads are the user's own repos).
-  - Protecting host home contents that are *not* mounted (they aren't reachable).
+The container must protect installed packages, system services, `/usr`, `/etc`,
+`/var`, and all host files that are not mounted. It is not intended to:
 
-This reframes the original design, whose accreted decisions (read-write `~/.claude` framed
-as a "trust" compromise, per-repo GitHub App token isolation, `/home/dev` + `/workspace`
-path remapping) went beyond — and in places *against* — "protect the host."
+- protect the mounted project or Claude state;
+- give the container GitHub access;
+- restrict network access;
+- protect against a kernel or container-runtime vulnerability.
 
-## 2. Core principle: a path-identical mirror
+The earlier design added GitHub App tokens and changed home and project paths.
+Those choices did not help protect the host OS and caused Claude state and plugins
+to use the wrong locations.
 
-The container is a **faithful, path-identical mirror** of the user's environment, isolated
-**only at the system layer**. Inside, the agent runs as the host user, at the host's real
-`$HOME`, with the repo at its **real host path**. Everything Claude writes — memories,
-session history, plugins, config, refreshed credentials — therefore lands exactly where the
-host expects it. The container differs from the host in one way only: the system layer is
-the image's own and ephemeral.
+## 2. Why host paths must be preserved
 
-This principle eliminates every path-translation hack that the old design needed (see §5),
-because there is no path translation: host and box paths are identical.
+The container runs as the host user, with the same `$HOME`, and mounts the project
+at its host path. Claude therefore writes sessions, memories, plugins, settings,
+and refreshed credentials where the host installation expects them. Only the
+operating-system files come from the image.
 
-### Why path-identity matters (root cause of the old bugs)
+Claude groups project state by working-directory path. The old container mounted
+every project at `/workspace`, so it wrote to a separate `-workspace` state
+directory instead of the project's normal directory. Plugins also stored absolute
+paths below the host home directory, but the old container used `/home/dev`.
+Keeping both paths unchanged fixes these problems without translation code.
 
-Claude keys project-scoped state — **memories, session history, "trust this folder"** — by
-the working-directory path. The old box ran the repo at `/workspace`, so everything the
-agent wrote landed in a `-workspace` project bucket, **separate** from the repo's real
-bucket (`-home-<user>-...-<repo>`). The desired memory-persistence was silently broken.
-Plugins broke for the same reason: their cache/marketplace locations are recorded as
-absolute paths under the host home (`/home/<user>/.claude/plugins/...`), which did not exist
-at the box's `/home/dev`. Running at identical paths fixes both at the source.
+## 3. Launch process
 
-## 3. Architecture & launch flow
+When started in a Git repository, `ccbox`:
 
-`ccbox` (host launcher), run from inside a git repo:
+1. finds the repository root;
+2. checks that Docker provides `sysbox-runc`;
+3. resolves the host `claude` executable;
+4. creates a project name for `ccbox-docker-<project>`;
+5. combines default ports, `CCBOX_PORTS`, and `<project>/.ccbox/ports`;
+6. runs Docker as the host UID and GID, with the host home and project paths;
+7. starts inner Docker and then runs
+   `claude --dangerously-skip-permissions "$@"`.
 
-1. `git rev-parse --show-toplevel` → repo root (abort if not a git repo).
-2. Confirm the `sysbox-runc` runtime is available (else point to the prerequisite).
-3. Resolve the host `claude` binary: `readlink -f "$(command -v claude)"`. Abort with a
-   clear message if `claude` is not found on the host.
-4. Compute a per-project slug → inner-Docker data volume `ccbox-docker-<slug>`.
-5. Build the published-port list (default range + `$CCBOX_PORTS` + `<repo>/.ccbox/ports`).
-6. `docker run -it --rm --runtime=sysbox-runc` as the host UID/GID, `$HOME` = real host
-   home, with the mounts/env in §4, running the **host** `claude` binary.
-7. `entrypoint.sh` starts the inner `dockerd` (sysbox makes it host-safe), then `exec`s the
-   resolved host `claude --dangerously-skip-permissions "$@"`.
+## 4. Mounts and settings
 
-## 4. Mounts & settings (the complete contract)
+| Mount or setting | Access | Purpose |
+| --- | --- | --- |
+| Project at its host path | read-write | Keep edits, commits, and project state in their normal location |
+| `~/.claude` | read-write | Preserve sessions, memories, plugins, settings, and credential refresh |
+| `~/.gitconfig` | read-only | Use the host commit identity and Git settings |
+| Host Claude installation | read-only | Run the same Claude version as the host |
+| `ccbox-docker-<project>` at `/var/lib/docker` | read-write volume | Preserve inner-Docker data for that project |
+| `CLAUDE_CONFIG_DIR=$HOME/.claude` | environment | Keep `.claude.json` inside the mounted directory |
+| Host username, UID, GID, and home path | environment | Avoid root and preserve absolute paths |
+| Published ports | Docker setting | Reach services from the host browser |
+| Terminal tint, `CCBOX=1`, `CCBOX_VERSION` | environment | Identify a ccbox session |
 
-Container runs as the **host user** (real username, UID/GID), `$HOME` = the host home path.
+The container does not mount `~/.config/gh`, `~/.ssh`, shell startup files, or
+other home-directory contents. The user pushes from the host.
 
-| Mount / setting | Mode | Why |
-|---|---|---|
-| repo at its **real host path** (= workdir) | read-write | edits + commits are real; unifies memories/history/trust |
-| `~/.claude` at real path | **read-write** | memories, config, plugins, and credential-refresh persist to host (the stated goal) |
-| `~/.gitconfig` at real path | read-only | commit identity + settings; git only reads it to author commits |
-| host `claude` install (`~/.local/share/claude`) | read-only | box runs the **host's** binary → always matches host version; agent cannot overwrite it; in-box self-update stays disabled |
-| `ccbox-docker-<slug>` → `/var/lib/docker` | volume | inner Docker data (DBs, image cache) persists per project |
-| `-e CLAUDE_CONFIG_DIR=$HOME/.claude` | — | keeps `.claude.json` inside the mounted dir → no re-onboarding, avoids the single-file-mount `EBUSY` problem |
-| `-e HOME=$HOME`, real username/UID/GID | — | path-identity; non-root (Claude refuses bypass mode as root) |
-| published ports (`-p`) | — | host browser → in-box app |
-| terminal tint + `-e CCBOX=1` / `CCBOX_VERSION` | — | sandbox visual cue + detectable marker |
-| inner `dockerd` (started by entrypoint) | — | run the repo's own `docker compose` stack |
+### Claude comes from the host
 
-**Not mounted (by decision):** `~/.config/gh` and any GitHub credentials (no push/PR from
-the box — commits are local, the user pushes from the host); `~/.ssh` (no SSH needed — the
-user's GitHub auth is HTTPS-via-`gh`, and the user does not sign commits); shell dotfiles
-(`~/.bashrc`/`~/.profile`/version-manager shims) — the box uses the image's default shell
-with baked-in toolchains on `PATH`.
+The image does not install Claude Code. The launcher mounts the host native
+installation read-only, which keeps host and container versions equal without an
+image rebuild. Node.js remains in the image for project work and Node-based
+plugins.
 
-### Claude binary: mounted from host, not built in
+The approved design supports the native installer under
+`~/.local/share/claude/versions`. An npm-global installation would also require
+its Node module tree and was left for later work.
 
-The image does **not** install `claude`. The launcher resolves the host's current `claude`
-and mounts its install tree read-only; the box executes that binary. Consequences:
+## 5. Removed and retained parts
 
-- The box's `claude` version **always equals the host's**, automatically, with no rebuild.
-- Deletes the in-image `npm install`, the `CLAUDE_VERSION` build arg, and any
-  build-time version-resolution logic.
-- **Assumption:** host uses the **native installer** layout (a single self-contained ELF
-  under `~/.local/share/claude/versions/`). A host that installed `claude` via npm-global
-  would instead need its `node_modules` tree mounted; the launcher detects the resolved path
-  generically and errors clearly if `claude` is absent.
-- Node.js stays in the image (language toolchain + npx-based plugins like context7), just
-  not for `claude` itself.
+The redesign removes:
 
-## 5. What gets deleted
+- the GitHub App helper, private key, token creation, and related documentation;
+- `/home/dev`, `/workspace`, and all path-conversion links and variables;
+- the Claude Code package and version selection from the image.
 
-- **The entire GitHub App subsystem:** `bin/ccbox-token`, `bin/ccbox-setup`, the `.pem` /
-  `app.env` files, the RS256 JWT minting, and all GitHub-App documentation. It only ever
-  protected *other repos* — out of scope. Nothing replaces it (no GitHub access in-box).
-- **All path-translation hacks:** the `/home/dev` user, the `/workspace` remap, the plugin
-  path-bridge symlink (`CCBOX_HOST_HOME` + the entrypoint `ln -s`), and the first-run
-  `.claude.json` seed. Unnecessary once paths mirror the host.
-- **The in-image `claude` install** and its versioning machinery (see §4).
+It keeps:
 
-## 6. What's kept
+- sysbox and inner Docker with one data volume per project;
+- published ports, terminal tint, and `CCBOX` markers;
+- shared language caches;
+- the Dockerfile order that keeps toolchain layers cached when only the
+  entrypoint changes.
 
-- **Inner Docker + sysbox + per-project data volume** — the user needs to run the repo's own
-  stack; sysbox also provides the user-namespace remap that hardens the host boundary.
-- **Published ports**, the **terminal tint** sandbox cue, the **`CCBOX=1`** marker, and the
-  cross-project language caches.
-- **The Dockerfile layer reorder** (entrypoint `COPY` after the heavy toolchain layers) so
-  rebuilds stay cheap. Minor, but harmless and useful.
+## 6. Files Claude can change
 
-## 7. Security model
+Claude can change the mounted project, all of `~/.claude`, and the project's
+inner-Docker data. Git history is the recovery method for project files.
 
-- **Protected:** the host system (OS, packages, `/usr`, `/etc`, `/var`, anything outside the
-  explicit mounts). Enforced by: ephemeral image rootfs + non-root container user + sysbox
-  user-namespace remap (container-root ≠ host-root) + the documented HARD RULES (never mount
-  the host Docker socket, never `--privileged`, never `--network=host`).
-- **In-scope blast radius (agent can affect, by design):** the mounted repo (git history is
-  the undo), `~/.claude` (memories/config/plugins/credentials), and the project's
-  inner-Docker data volume. **Nothing else** — no other repos, no GitHub account (no creds
-  present), no other home contents (not mounted).
-- **Accepted caveats** (inherent to the goals, named explicitly):
-  - Read-write `~/.claude` means the agent *could* corrupt the host's Claude state. This is
-    the price of memory-persistence and is accepted.
-  - The box may surface the account's claude.ai connectors (Gmail/Drive/Calendar) via the
-    shared login; they are auth-gated and are not a *host* risk, so out of scope.
+It cannot reach other projects, other home-directory contents, or GitHub
+credentials through normal mounted paths. Sysbox maps container root to an
+unprivileged host user. The launcher must never mount the host Docker socket or
+use `--privileged` or `--network=host`.
 
-## 8. Breaking changes & migration
+Because `~/.claude` is writable, Claude can damage its host settings, plugins,
+or credentials. Shared login state may also expose account connectors available
+to Claude. These effects were accepted to preserve a complete Claude environment.
 
-- One-time image rebuild (new user/home; no in-image `claude`).
-- `~/.config/ccbox` (GitHub App key + `app.env`) becomes dead; `uninstall`/docs should
-  mention removing it. Optionally delete the GitHub App itself in GitHub settings.
-- The orphaned `-workspace` project bucket can be deleted; real-path buckets take over.
-- `CCBOX_VERSION` bump; `README.md` and `CLAUDE.md` rewritten to the new model.
-- **Working-tree note:** the current branch has experimental edits from the abandoned
-  "share + bridge" direction (`entrypoint.sh` symlink bridge, `CCBOX_HOST_HOME` in
-  `bin/ccbox`, `Dockerfile` claude-version arg, a now-incorrect `README.md` bullet). These
-  are to be reverted/rewritten during implementation, not carried forward.
+## 7. Migration and remaining work
 
-## 9. Non-goals (unchanged from original where still valid)
+Implementation required:
 
-- No network egress firewall / allowlist.
-- Linux host only; amd64 (native-installer `claude` is amd64 here).
-- No microVM/Kata/KVM.
-- No headless/`-p` print mode — interactive chat only.
+- one image rebuild for the new user and home path;
+- removal of obsolete `~/.config/ccbox` GitHub App files;
+- optional removal of the old `-workspace` Claude project directory;
+- updates to the launcher, entrypoint, Dockerfile, README, and version.
 
-## 10. Open items / future
+Deferred items were support for npm-global Claude installations and optional
+shell-startup-file mounts.
 
-- Generic host-`claude` path detection for npm-global installs (currently native-installer
-  layout assumed; error clearly otherwise).
-- Optional shell-dotfile mirroring (deferred — image defaults for now).
+## Verification completed during design
 
-## Appendix A — Empirical verification (already done)
+Tests against the existing image showed:
 
-These were tested against the real `ccbox:latest` image during design, not assumed:
-
-- **Plugins fail in the old box:** all 14 report `failed to load — marketplace … cache-miss`
-  because recorded paths are `/home/<user>/.claude/...` and the box home is `/home/dev`.
-- **Path-identity fixes them:** bridging the host home path made all 14 load (`✔ enabled`),
-  proving the root cause is the path mismatch.
-- **Memory fragmentation is real:** `~/.claude/projects/` contains both
-  `-home-paulius-source-github-plabanauskis-ccbox` (host) and `-workspace` (box) buckets.
-- **Host `claude` runs in the box:** mounting `~/.local` RO and running `claude --version`
-  inside `ccbox:latest` printed `2.1.185` — the host's exact version (box glibc 2.36 suffices
-  for the self-contained ELF).
-- **Commit-as-user works with RO gitconfig:** in-box `git var GIT_AUTHOR_IDENT` →
-  `Paulius Labanauskis <paulius@labanausk.is>`; repo `.git/` writable; `~/.gitconfig` not
-  writable. Identity is read-only-safe; commits land in the RW repo.
+- all 14 plugins failed when their recorded host paths did not exist in the
+  container;
+- exposing the same host home path made all 14 plugins load;
+- Claude state contained both the correct host project directory and the old
+  `-workspace` directory;
+- the read-only host Claude binary ran successfully in the container and reported
+  the same version (`2.1.185`);
+- Git used the host identity from a read-only `.gitconfig`, created commits in the
+  writable project, and could not modify the Git configuration.

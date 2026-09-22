@@ -5,7 +5,7 @@
   <img src="assets/logo.svg" alt="pibox" width="320">
 </picture>
 
-<p><strong>Give Pi full control of your project — pibox is designed to narrow the blast radius.</strong></p>
+<p><strong>Run Pi in a sysbox container.</strong></p>
 
 <p>
   <a href="../../LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-555"></a>
@@ -15,36 +15,61 @@
 
 </div>
 
-`pibox` launches the exact host Pi installation as the host user inside a sysbox-backed Docker container. Pi [runs tools with all permissions by default](https://pi.dev); no approval-bypass or sandbox-bypass option exists or is added. The whole Pi process, including built-in tools, user `!` commands, and extension tools, executes inside the external container boundary.
+`pibox` runs the host's Pi installation as the host user in a Docker container.
+Pi [already runs tools with full permissions](https://pi.dev), so pibox does not
+add an approval or sandbox bypass option. Built-in tools, `!` commands, and
+extension tools all run inside the container.
 
-The mounted project is real and writable. Run pibox from a Git repository whenever possible: Git history is the practical undo path. Outside a repository, pibox warns that edits and deletions have no Git undo and requires confirmation.
+Run it from a Git repository when possible so Git can recover project changes.
+Outside a repository, pibox warns that edits have no Git undo and asks before
+continuing.
 
-> Linux host and amd64 are required. The design is adapted from [RchGrav/claudebox](https://github.com/RchGrav/claudebox) (MIT) and follows Pi's documented whole-process [plain Docker pattern](https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/docs/containerization.md), with sysbox and a richer development image added.
+> Requires a Linux amd64 host. The design includes work adapted from
+> [RchGrav/claudebox](https://github.com/RchGrav/claudebox) (MIT) and follows
+> Pi's [container guide](https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/docs/containerization.md).
 
-## Security model
+## Safety
 
-The intended blast radius is narrow but real: Pi can fully change the mounted project, all host Pi state under `$HOME/.pi`, dependency caches, and per-project inner-Docker data.
+Pi has full control inside the container. These host locations are also writable
+from the container:
 
-- Docker runs with `--runtime=sysbox-runc`. Sysbox user-namespace isolation is the intended security boundary.
-- The selected project and the complete `$HOME/.pi` directory are mounted read-write at path-identical locations. This preserves core agent state plus package-owned sibling directories such as `~/.pi/context-mode`, including directories created by packages installed later.
-- A custom `PI_CODING_AGENT_DIR` outside `$HOME/.pi` receives its own read-write path-identical mount. A custom `PI_CODING_AGENT_SESSION_DIR` is mounted separately only when it is outside both `$HOME/.pi` and agent state.
-- The resolved host Pi installation is mounted read-only. Supported layouts are the current `@earendil-works/pi-coding-agent` npm package and an official compiled Pi directory with adjacent runtime assets.
-- The host Docker socket is never mounted, and pibox does not use privileged mode or host networking. Docker available inside the box is an isolated inner daemon with project-specific storage.
-- Host SSH and GitHub CLI credentials are not mounted. A read-only `.gitconfig` provides commit identity but no push credential.
-- Provider credentials in Pi's mounted `auth.json` can be refreshed in place. pibox also forwards only an explicit allowlist of supported provider environment variables; it never forwards the entire host environment.
-- There is no network-egress firewall or kernel-escape protection. Treat the project and Pi state as intentionally writable, review the boundary, and use pibox only where that tradeoff is acceptable.
+- the selected project;
+- all of `$HOME/.pi`, including authentication, settings, packages, sessions,
+  extensions, databases, and caches;
+- custom `PI_CODING_AGENT_DIR` or `PI_CODING_AGENT_SESSION_DIR` locations when
+  they are outside `$HOME/.pi`;
+- shared language caches and the project's inner-Docker data volume.
 
-Mounting the complete host `$HOME/.pi` exposes authentication, settings, packages, sessions, extension code, package-specific databases, caches, and any future state stored there. Extensions run with the same in-box authority as Pi. This broad writable mount is intentional: it preserves the complete host Pi environment rather than maintaining an allowlist that becomes incomplete as packages add state directories. Setting `PI_CODING_AGENT_DIR` elsewhere does not remove `$HOME/.pi` from the boundary.
+The complete `$HOME/.pi` mount is intentional. Packages can store data beside
+`~/.pi/agent`, and mounting only known directories would lose new package data.
+Extensions have the same access as the main Pi process.
 
-## Prerequisites
+The host Pi installation and `.gitconfig` are read-only. pibox does not mount the
+host Docker socket, SSH keys, GitHub CLI credentials, other projects, or the rest
+of the home directory. It does not use privileged mode or host networking.
+Sysbox maps container root to an unprivileged host user.
 
-1. **Docker:** `docker --version` works without sudo, and `docker info -f '{{.Runtimes}}'` lists `sysbox-runc`.
-2. **sysbox:** install and configure sysbox-ce for Docker. No fallback runtime is accepted.
-3. **Host Pi:** `pi` is on `PATH` and comes from `@earendil-works/pi-coding-agent` or an official compiled directory. pibox mounts this installation instead of baking in a second version.
-4. **Pi state:** run Pi on the host so `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}` exists. pibox creates `$HOME/.pi` as the host user if needed, mounts it completely, and also mounts configured custom agent or session directories when they live outside it.
-5. **Authentication:** use `/login` in host Pi so `auth.json` contains provider state, or export a supported provider credential. `pibox doctor` reports an empty auth configuration, but launch does not gate on one auth method because Pi also supports local/custom providers.
+This setup protects ordinary host system files, but it does not protect writable
+mounts from mistakes or malicious commands. It also has no network firewall and
+does not protect against a kernel or container-runtime vulnerability. Back up
+important project and Pi state.
+
+## Requirements
+
+1. **Docker:** `docker --version` works without sudo.
+2. **sysbox-ce:** install it for Docker and confirm
+   `docker info -f '{{.Runtimes}}'` lists `sysbox-runc`.
+3. **Pi:** `pi` is on `PATH` and comes from
+   `@earendil-works/pi-coding-agent` or an official compiled Pi directory.
+4. **Pi state:** run Pi on the host so
+   `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}` exists.
+5. **Authentication:** use `/login` in host Pi or export a supported provider
+   credential. `pibox doctor` warns when `auth.json` is empty but does not block
+   launch because local and custom providers may not use it.
 
 ## Build and install
+
+Enable pibox from the [pitools](../../README.md) suite, then build its image:
 
 ```bash
 pitools enable pibox
@@ -52,58 +77,78 @@ pibox doctor
 pibox build
 ```
 
-The image defaults to `pibox:latest` and is built locally for the current username, UID, GID, and home path. Set `PIBOX_IMAGE` to another image name or `PIBOX_SHARE_DIR` to a directory containing the pibox `Dockerfile`.
+The local image defaults to `pibox:latest` and is built for the current username,
+UID, GID, and home path. Use `PIBOX_IMAGE` for another image name or
+`PIBOX_SHARE_DIR` for another directory containing the Dockerfile.
 
-The image includes Node 24, Python 3 + `uv`, Go 1.26.x, Rust stable, .NET 10, GitHub CLI, Git, jq, ripgrep, fd, OpenSSL, socat, and inner Docker + Compose. Pi itself is deliberately not baked in.
+The image contains Node 24, Python 3 with `uv`, Go 1.26.x, stable Rust, .NET 10,
+Git, GitHub CLI, jq, ripgrep, fd, OpenSSL, socat, and Docker with Compose. Pi is
+mounted from the host instead of installed in the image.
 
 ## Usage
 
 ```bash
 cd ~/code/my-project
-pibox                                  # Pi in the sysbox container
-pibox --model anthropic/claude-sonnet  # pass Pi arguments unchanged
-pibox --no-extensions                  # any Pi CLI option works
+pibox                                  # start Pi in the container
+pibox --model anthropic/claude-sonnet  # pass arguments to Pi
+pibox --no-extensions
 pibox doctor
 pibox version
 ```
 
-The first word `build`, `doctor`, `uninstall`, `help`, or `version` is a pibox subcommand. Any other arguments pass to Pi unchanged. `PI_SKIP_VERSION_CHECK=1` is set in-box because the host-mounted Pi installation is the version source.
+The first argument `build`, `doctor`, `uninstall`, `help`, or `version` selects a
+pibox command. Other arguments pass to Pi unchanged. `PI_SKIP_VERSION_CHECK=1`
+is set in the container because the mounted host installation supplies Pi.
+
+Set `PIBOX_NO_DOCKER=1` for faster startup without inner Docker. pibox tints the
+terminal while it runs; set `PIBOX_TINT` to change the color or
+`PIBOX_NO_TINT=1` to disable it. The container receives `PIBOX=1` and
+`PIBOX_VERSION`.
 
 ### Provider environment
 
-Mounted `auth.json` is preferred. When environment credentials are used, pibox forwards an explicit list covering Pi's built-in Anthropic, OpenAI/Azure, Google, Bedrock, OpenRouter, Cloudflare, Mistral, Groq, Cerebras, xAI, DeepSeek, NVIDIA, ZAI, Qwen, MiniMax, Xiaomi, Kimi, and other supported providers, plus proxy variables. Unrelated environment variables and credential directories such as `~/.aws` are not forwarded.
+Mounted `auth.json` is preferred. pibox forwards a fixed list of provider
+credentials for Pi's built-in providers, including Anthropic, OpenAI/Azure,
+Google, Bedrock, OpenRouter, Cloudflare, Mistral, Groq, Cerebras, xAI, DeepSeek,
+NVIDIA, ZAI, Qwen, MiniMax, Xiaomi, and Kimi. It also forwards proxy settings.
+It does not copy the full host environment or credential directories such as
+`~/.aws`.
 
-### Ports, caches, and inner Docker
+## Ports, caches, and inner Docker
 
-The default host-to-box port range is `3000-3010`. Add ports with `PIBOX_PORTS` (space-separated), or create `<repo>/.pibox/ports` with one port or range per line:
+Ports `3000-3010` are published by default. Add ports with `PIBOX_PORTS`, or put
+one port or range per line in `<project>/.pibox/ports`:
 
 ```bash
 PIBOX_PORTS="8080 5173" pibox
 ```
 
-Services must listen on `0.0.0.0` in the box. The box starts its inner Docker daemon unless `PIBOX_NO_DOCKER=1` is set. Shared dependency caches are `pibox-npm`, `pibox-cargo`, `pibox-go`, `pibox-uv`, and `pibox-nuget`; inner Docker data uses `pibox-docker-<project>`.
+Services must listen on `0.0.0.0`. The inner Docker daemon starts in the
+background; wait until `docker info` succeeds before the first Docker command.
 
-For a visual reminder, pibox tints the terminal background. Configure `PIBOX_TINT` or disable it with `PIBOX_NO_TINT=1`. The container receives `PIBOX=1` and `PIBOX_VERSION`.
+Shared cache volumes are `pibox-npm`, `pibox-cargo`, `pibox-go`, `pibox-uv`, and
+`pibox-nuget`. Inner Docker uses `pibox-docker-<project>`.
 
 ## Uninstall
 
 ```bash
-pibox uninstall        # image and shared caches; asks before project data volumes
+pibox uninstall        # remove the image and shared caches; ask before project volumes
 pitools disable pibox  # remove the command link
 ```
 
-Run `pibox uninstall` before `pitools uninstall`. Project-specific data volumes are deleted only after explicit confirmation.
+Run `pibox uninstall` before `pitools uninstall` when you also want Docker data
+removed. Project volumes are deleted only after confirmation.
 
 ## Troubleshooting
 
-| Symptom | Fix |
+| Problem | Fix |
 | --- | --- |
-| `sysbox runtime not found` | Install/configure sysbox-ce and verify Docker lists `sysbox-runc`. |
-| Host Pi layout is unsupported | Install the current `@earendil-works/pi-coding-agent` package or use an official compiled Pi directory. |
-| Agent state is missing | Run `pi` on the host first, or set `PI_CODING_AGENT_DIR` to an existing directory. |
+| `sysbox runtime not found` | Install sysbox-ce and confirm Docker lists `sysbox-runc`. |
+| Host Pi layout is unsupported | Install the current npm package or use an official compiled Pi directory. |
+| Pi state is missing | Run Pi on the host or set `PI_CODING_AGENT_DIR` to an existing directory. |
 | Custom session directory is missing | Create `PI_CODING_AGENT_SESSION_DIR` before launching. |
-| `doctor` reports auth missing | Use `/login` in host Pi or export a supported provider credential. |
-| Image is missing | Run `pibox build`, or accept the interactive build prompt. |
-| Inner Docker is initially unavailable | Wait until `docker info` succeeds, or use `PIBOX_NO_DOCKER=1`. |
-| Browser cannot reach a service | Bind it to `0.0.0.0` and publish the port with `PIBOX_PORTS` or `.pibox/ports`. |
-| Non-Git warning appears | Continue only after accepting the lack of Git undo, or use a repository. |
+| `doctor` reports no authentication | Use `/login` in host Pi or pass a supported provider credential. |
+| Image is missing | Run `pibox build` or accept the build prompt. |
+| Inner Docker is not ready | Wait for `docker info`, or use `PIBOX_NO_DOCKER=1`. |
+| A host browser cannot reach a service | Bind the service to `0.0.0.0` and publish its port. |
+| The non-Git warning appears | Continue only if you accept having no Git undo, or run from a repository. |

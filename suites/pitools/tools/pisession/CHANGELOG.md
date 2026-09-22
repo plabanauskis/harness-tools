@@ -1,9 +1,10 @@
 # Changelog — pisession
 
-All notable changes to pisession are documented here. Versions follow [semver](https://semver.org).
+Notable changes to pisession. Releases follow [Semantic Versioning](https://semver.org).
 
 ## 1.0.0 — 2026-08-28
 
-- Discover valid Pi JSONL sessions across all working directories.
-- Parse Pi headers, names, user messages, model changes, and format versions.
-- Add a portable fzf picker with live/gone rows, previews, and exact-file resume.
+- Find valid Pi JSONL sessions across all working directories.
+- Read session headers, names, user messages, model changes, and format versions.
+- Add a Linux/macOS fzf picker with live and missing directories, previews, and
+  exact-file resume.

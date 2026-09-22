@@ -5,50 +5,43 @@
   <img src="assets/logo.svg" alt="cchat" width="300">
 </picture>
 
-<p><strong>A throwaway Claude Code chat, in one command — leaves no trace.</strong></p>
-
-<p>
-  For the quick question you don't want cluttering a real project. <code>cchat</code> drops you into
-  Claude Code in a fresh temp dir and gets out of the way — your shell's working directory is
-  untouched, and there's nothing to clean up afterward.
-</p>
+<p><strong>Start a Claude Code chat in a temporary directory.</strong></p>
 
 <p>
   <a href="../../LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-555"></a>
-  <a href="https://github.com/plabanauskis/harness-tools/releases"><img alt="Latest release: 1.0.0" src="https://img.shields.io/badge/release-1.0.0-D97757"></a>
   <img alt="Platform: Linux · macOS" src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS-555">
   <img alt="Built for Claude Code" src="https://img.shields.io/badge/built%20for-Claude%20Code-D97757">
 </p>
 
 </div>
 
-Open Claude Code in a fresh, throwaway directory — for quick questions you don't
-want cluttering a real project, and that you don't need to keep.
-
-`cchat` makes a new temp dir under `$TMPDIR` (default `/tmp`), `cd`s into it, and
-`exec`s `claude` there. Because it runs as its own process, your current shell's
-working directory is untouched. The temp dir persists until reboot (so the
-session is resumable until then — see `ccsession`).
+Use `cchat` for questions that do not belong to a project. It creates a temporary
+directory, changes into it, and starts Claude Code without changing the working
+directory of the shell that launched it.
 
 ## Requirements
 
-`claude` on your `PATH`.
+- `claude` on `PATH`
+- Linux or macOS
 
 ## Install
 
-Part of the [cctools](../../README.md) bundle:
+Enable it from the [cctools](../../README.md) suite:
 
 ```bash
 cctools enable cchat
 ```
 
-Or, from the monorepo root: `bash install.sh --suite=cctools --tools=cchat`.
-See the suite guide above for the public one-line installer.
-
 ## Usage
 
 ```bash
-cchat                 # fresh throwaway chat
-cchat --model opus    # args pass straight through to claude
-cchat --help          # show help
+cchat                 # start in a new temporary directory
+cchat --model opus    # pass arguments to Claude Code unchanged
+cchat --help          # show cchat help
 ```
+
+## Saved sessions
+
+The directory is created under `${TMPDIR:-/tmp}` and remains after the command
+ends. This keeps the conversation available to `ccsession` until the directory
+is removed, often at reboot.

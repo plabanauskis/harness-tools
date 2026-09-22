@@ -1,106 +1,99 @@
-# Migration and provenance
+# Migration and repository history
 
-## What has and has not moved
+## What changed
 
-Development is consolidated in `plabanauskis/harness-tools`. The original
-`cctools`, `cotools`, and `pitools` repositories and source checkouts are left
-unchanged. They are not archived, redirected, or automatically updated by this
-migration. Existing installed clones still track their original repositories
-until you explicitly replace them.
+Development now happens in `plabanauskis/harness-tools`. The original `cctools`,
+`cotools`, and `pitools` repositories and local source checkouts were not changed
+or archived. Existing installed clones continue to use their original source
+until you replace them.
 
-The repository is public. Installation and updates need no GitHub account.
-See the [root installation guide](../README.md#install) for the standalone
-`curl | bash` installer and read-before-running option.
+The repository is public, so installation and updates do not require a GitHub
+account. See the [installation guide](../README.md#install).
 
-Already installed from this monorepo, formerly named **agent-tools**? No
-reinstall is needed; see the rename guidance below. The separate-repository
-migration procedure applies only to clones of the original three repositories.
+The same monorepo was previously named `plabanauskis/agent-tools`. Existing
+installs from that monorepo do not need to be reinstalled; update their Git URL
+as described below. The separate `agentic-tools` repository is unrelated.
 
 ## Repository rename
 
-The GitHub repository was renamed from `plabanauskis/agent-tools` to
-`plabanauskis/harness-tools`; it was not recreated. Commit IDs, tags, issues,
-releases, and public visibility are preserved. The separate `agentic-tools`
-repository is unrelated and unchanged.
-
-GitHub redirects old repository Git URLs, but explicitly updating each clone's
-origin avoids depending on that redirect. For example, for a Pi installation:
+GitHub preserved commits, tags, issues, releases, and redirects when
+`agent-tools` became `harness-tools`. Updating each clone avoids relying on the
+redirect. For a Pi installation:
 
 ```bash
 prefix="${PITOOLS_HOME:-$HOME/.local/share/pitools}"
-git -C "$prefix" remote get-url origin   # inspect before changing a fork/mirror
+git -C "$prefix" remote get-url origin
 git -C "$prefix" remote set-url origin https://github.com/plabanauskis/harness-tools.git
 ```
 
-Apply the equivalent change to other suite clones only if their origin was the
-old monorepo, not an intentional fork or one of the original suite repositories.
-Update exported `*_REPO` overrides and any saved installer commands too.
+Make the same change for another suite only when its origin is the old monorepo.
+Do not replace an intentional fork or an original suite repository. Also update
+saved installer commands and `*_REPO` settings.
 
-For a development checkout, rename its local directory if desired and update
-its Git origin to the new URL. If an installed clone uses a `file://` origin
-pointing to that checkout, update it to the checkout's new absolute path;
-GitHub redirects cannot repair local filesystem URLs. Likewise, manually linked
-commands pointing directly into a moved development checkout need new targets.
+A development checkout may be renamed locally. Update its Git origin afterward.
+If an installed clone uses a `file://` URL, change that URL to the checkout's new
+absolute path. Recreate any command links that point directly into a moved
+checkout.
 
-Keep suite prefixes, command names, environment overrides, Docker image/volume
-names, and the `.agent-tools-suite` ownership marker unchanged. That marker
-intentionally retains its old name so existing installations still pass the
-update/uninstall ownership checks. No Docker rebuild or state migration is needed.
+Do not rename suite directories, commands, environment settings, Docker images
+or volumes, or the `.agent-tools-suite` ownership marker. The marker keeps its
+old name for compatibility. No Docker rebuild or state migration is needed.
 
-## Migrate one installed suite
+## Move an installation from an original suite repository
 
-These steps concern the **installed clone** (normally `~/.local/share/<suite>`),
-not your source checkout. Do not run box uninstall just to migrate: it can remove
-images or volumes that you want to retain.
+These steps replace an **installed clone**, normally
+`~/.local/share/<suite>`. They do not replace a development checkout. Do not run
+a box tool's uninstall command unless you also want to remove its Docker data.
 
-Example for Pi; substitute the suite names and overrides for Claude or Codex:
+The example uses Pi; substitute the Claude Code or Codex suite names and settings
+when needed.
 
-1. Record your installation settings and enabled tools:
+1. Record the current settings and enabled tools:
 
    ```bash
    pitools list
-   printf 'prefix: %s\nbin: %s\n' "${PITOOLS_HOME:-$HOME/.local/share/pitools}" "${PITOOLS_BIN:-$HOME/.local/bin}"
+   printf 'prefix: %s\nbin: %s\n' \
+     "${PITOOLS_HOME:-$HOME/.local/share/pitools}" \
+     "${PITOOLS_BIN:-$HOME/.local/bin}"
    ```
 
-   Save the list of enabled tools. Inspect any local edits in the installed clone
-   and keep them in your backup. Also note custom `PITOOLS_REPO`/`PITOOLS_BRANCH`
-   settings; an old repository override must not be reused accidentally.
+   Save the enabled-tool list. Back up any local changes in the installed clone.
+   Record custom `PITOOLS_REPO` and `PITOOLS_BRANCH` settings, but do not reuse an
+   old repository URL by accident.
 
-2. Obtain the new source checkout (no authentication required):
+2. Get the monorepo:
 
    ```bash
    git clone https://github.com/plabanauskis/harness-tools.git
    cd harness-tools
    ```
 
-   If you already have this checkout, use it rather than cloning again.
+   Reuse an existing checkout when available.
 
-3. Move the old installed clone aside, without deleting it:
+3. Move the old installed clone aside:
 
    ```bash
    prefix="${PITOOLS_HOME:-$HOME/.local/share/pitools}"
-   backup="${prefix}.pre-agent-tools"
+   backup="${prefix}.pre-harness-tools"
    test -d "$prefix/.git" && test ! -e "$backup" && mv -- "$prefix" "$backup"
    ```
 
-   Stop if the move did not succeed. Existing command symlinks may be temporarily
-   dangling until the installation completes. The backup preserves the old clone
-   and its Git configuration, not a copy of harness state.
+   Stop if the move fails. Command links may remain broken until installation
+   finishes. This backup contains the old clone, not Pi sessions or credentials.
 
-4. Install **all previously enabled tools**, using the new upstream explicitly:
+4. Install every previously enabled tool:
 
    ```bash
-   # Example: only these two were previously enabled; use your saved selection.
+   # Example selection; use the list saved in step 1.
    PITOOLS_REPO=https://github.com/plabanauskis/harness-tools.git PITOOLS_BRANCH=main \
      bash install.sh --suite=pitools --tools=pichat,pisession
    ```
 
-   Keep custom `PITOOLS_HOME` and `PITOOLS_BIN` exported if you use them. Add
-   `pibox` to the selection if it was enabled. If dependencies are temporarily
-   unavailable, `--force` preserves the requested links but does not install the
-   missing dependencies. Check the printed enabled/skipped summary.
+   Keep custom `PITOOLS_HOME` and `PITOOLS_BIN` values exported. Include `pibox`
+   if it was enabled. `--force` can preserve requested links while a dependency
+   is temporarily unavailable.
 
-5. Verify before removing any backup:
+5. Verify the new installation:
 
    ```bash
    pitools list
@@ -109,32 +102,28 @@ Example for Pi; substitute the suite names and overrides for Claude or Codex:
    readlink "${PITOOLS_BIN:-$HOME/.local/bin}/pichat"
    ```
 
-   Tool links now point under `<prefix>/suites/pitools/tools/`; the manager link
-   points to `<prefix>/bin/pitools`. If you deliberately dropped a formerly
-   enabled tool, inspect and remove only its stale old `<prefix>/tools/...`
-   symlink, not an unrelated user-managed command.
+   Tool links should point below `<prefix>/suites/pitools/tools/`; the manager
+   link should point to `<prefix>/bin/pitools`. Remove a stale old tool link only
+   after confirming that it is owned by the old installation.
 
-Repeat separately for `cctools` and `cotools`. Never assign two suites the same
-prefix: the ownership marker makes the installer and manager reject that mix.
+Repeat the process separately for `cctools` and `cotools`. Never give two suites
+the same install directory.
 
 ### State and rollback
 
-Session/state directories, credentials, `.ccbox`/`.cobox`/`.pibox` project
-settings, image names, and Docker volume names are unchanged. Migrating does not
-require a Docker rebuild. The shared Codex/Pi recipe affects the next explicit
-image build only.
+The migration does not change sessions, credentials, project settings, image
+names, or volume names. It does not require a Docker rebuild.
 
-To roll back, keep both clones: move the new installed prefix to a distinct
-backup location, restore the old clone to its original prefix, and restore
-owned command symlinks to the original layout using the old manager's `enable`
-commands. Restore the manager symlink to `<prefix>/bin/<suite>` as well. Do not
-run the new manager's uninstall after restoring the old clone; it is intentionally
-not marked as installer-managed monorepo state.
+To roll back, move the new clone elsewhere, restore the old clone at its original
+path, and use the old manager's `enable` commands to restore tool links. Restore
+the manager link to `<prefix>/bin/<suite>` as well. Do not run the new manager's
+uninstall command after restoring the old clone because the old clone does not
+carry the monorepo ownership marker.
 
-## Source history
+## Imported history
 
-The import commits use merge ancestry plus prefixed trees. Original commit IDs
-remain reachable from `main`; no original repository was rewritten.
+The original histories remain reachable from `main` through merge commits. Their
+commit IDs were not rewritten.
 
 | Source | Imported source HEAD | Import merge |
 | --- | --- | --- |
@@ -142,15 +131,12 @@ remain reachable from `main`; no original repository was rewritten.
 | cotools | `f64adc500e2e7ab042b6e0579fe0ef3041737925` | `d738e86` |
 | pitools | `f2f32b810222b4324d0a48d6e6ad36b4bb6bd76e` | `c98e38c` |
 
-The retained `ccbox-v1.1.0` tag points to its original commit and original
-single-suite layout, not the new monorepo. New per-tool tags identify complete
-monorepo snapshots. For pre-import history, inspect the original commit directly
-with `git show <source-commit>:<original-path>`; file paths before the import do
-not have the `suites/<suite>/` prefix.
+The retained `ccbox-v1.1.0` tag points to the original single-suite layout. New
+tool tags identify complete monorepo revisions. To inspect a file before import,
+use `git show <source-commit>:<original-path>`; those paths do not include the
+new `suites/<suite>/` prefix.
 
-The licenses and original tool changelogs remain under each suite. Root shared
-code uses the same MIT license. Original histories can contain older code and
-documentation. The initial public release was checked with Gitleaks against
-both the reachable Git history and current tracked files, with no leaks found.
-Repeat both checks before publishing future imported histories; a clean scan
-is not a guarantee that every sensitive value has been identified.
+Licenses and tool changelogs remain under each suite. Before the initial public
+release, Gitleaks found no secrets in reachable history or current tracked files.
+Repeat both scans before publishing another imported history. A clean scan cannot
+prove that every sensitive value was found.

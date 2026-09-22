@@ -5,208 +5,138 @@
   <img src="assets/logo.svg" alt="ccbox" width="320">
 </picture>
 
-<p><strong>Give Claude Code full control of your project, never of your computer.</strong></p>
-
-<p>
-  Point it at any repo and it edits files, runs commands, and runs your tests without stopping to
-  ask. Everything happens inside a secure sandbox that mirrors your real setup — so even a bad
-  mistake can't reach your operating system or your other files.
-</p>
+<p><strong>Run Claude Code autonomously in a sysbox container.</strong></p>
 
 <p>
   <a href="../../LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-555"></a>
-  <a href="https://github.com/plabanauskis/harness-tools/releases"><img alt="Latest release: 1.1.0" src="https://img.shields.io/badge/release-1.1.0-D97757"></a>
   <img alt="Platform: Linux · amd64" src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20amd64-555">
   <img alt="Built for Claude Code" src="https://img.shields.io/badge/built%20for-Claude%20Code-D97757">
 </p>
 
 </div>
 
-One command drops you into the normal interactive Claude Code **terminal chat** running inside
-a Docker container with `--dangerously-skip-permissions`. Run it from a git repository (it
-mounts the repo root), or from any other directory after a one-time warning — outside a repo
-there's no git history to undo the agent's edits. The agent works fully autonomously (no
-per-action prompts) on your project, can run its own `docker compose` stack and test suite, and
-**cannot make system-wide changes that damage the host OS**.
+`ccbox` runs the host's Claude Code installation in a Docker container with
+`--dangerously-skip-permissions`. The project and `~/.claude` are mounted at the
+same absolute paths they use on the host. Sessions, plugins, configuration, and
+Git identity therefore work without path conversion.
 
-The box is a **path-identical mirror** of your environment: it runs as *you*, at your real
-`$HOME`, with the repo at its real path, your `~/.claude` mounted read-write, and your host
-`claude` binary mounted read-only. So memories, plugins, config, and commit identity all
-behave exactly as on the host — only the system layer is isolated.
+Run it from a Git repository when possible so Git can recover project changes.
+Outside a repository, ccbox warns that edits have no Git undo and asks before
+continuing.
 
-> Linux host only. `amd64` assumed (see [Architecture notes](#architecture-notes)).
-> Portions adapted from [RchGrav/claudebox](https://github.com/RchGrav/claudebox) (MIT).
+> Requires a Linux amd64 host. The design includes work adapted from
+> [RchGrav/claudebox](https://github.com/RchGrav/claudebox) (MIT).
 
----
+## Safety
 
-## Security model
+Claude Code has full control inside the container. These host locations are also
+writable from the container:
 
-The threat model is deliberately narrow and one-directional: **protect the host system.**
-The agent has total freedom *inside* the box; it just can't change the host OS.
+- the selected project;
+- `~/.claude`, including sessions, plugins, settings, and file-based credentials;
+- shared language caches and the project's inner-Docker data volume.
 
-- **The container isolates the system layer.** The OS, installed packages, `/usr`, `/etc`,
-  `/var`, and anything **outside the explicit mounts** are the image's own and ephemeral.
-  ccbox runs under the **sysbox** runtime (`--runtime=sysbox-runc`), whose user namespaces map
-  container root to an unprivileged host user — so even a full Docker engine inside the box
-  can't touch the host.
-- **No host escalation paths.** Never mounts the host Docker socket, never uses `--privileged`
-  or `--network=host`. Inner Docker is a real `dockerd` running *inside* the sandbox.
-- **In-scope blast radius (the agent can change these — by design):**
-  - the **mounted repo** (edits/commits are real — git history is your undo),
-  - **`~/.claude`** read-write (so memories, plugins, config, and credential refresh persist
-    to the host — this is the point),
-  - the project's **inner-Docker data volume**.
-- **Out of reach:** other repos, other home contents (`~/.ssh`, other projects — not
-  mounted), and your GitHub account (no GitHub credentials are mounted, so the agent can
-  commit locally but **cannot push** from the box).
-- **Honest caveat:** because `~/.claude` is read-write, the agent *could* corrupt your host
-  Claude config/plugins/credentials. That is the price of memory-persistence, and is accepted.
+The host Claude Code installation and `.gitconfig` are read-only. ccbox does not
+mount the host Docker socket, SSH keys, GitHub CLI credentials, other projects,
+or the rest of the home directory. It does not use privileged mode or host
+networking. Sysbox maps container root to an unprivileged host user.
 
-This is **not** kernel-escape protection (no microVM/KVM) and there is **no network egress
-firewall** — neither is in scope.
+This setup protects ordinary host system files such as `/usr`, `/etc`, and
+`/var`, but it does not protect writable mounts from mistakes or malicious
+commands. It also has no network firewall and does not protect against a kernel
+or container-runtime vulnerability. Back up important project and Claude state.
 
----
+## Requirements
 
-## Prerequisites
+1. **Docker:** `docker --version` works without sudo.
+2. **sysbox-ce:** install it for Docker and confirm
+   `docker info -f '{{.Runtimes}}'` lists `sysbox-runc`. Kernel 5.12 or newer is
+   required for ID-mapped mounts. Packages are available from the
+   [sysbox releases](https://github.com/nestybox/sysbox/releases).
+3. **Claude Code:** `claude` is on `PATH` and uses the native installer under
+   `~/.local/share/claude`. npm-global installations are not supported.
+4. **Authentication:** log in on the host so
+   `~/.claude/.credentials.json` exists, or pass `ANTHROPIC_API_KEY`.
 
-You (the operator) do these once, by hand.
+Run `ccbox doctor` to check these requirements.
 
-### A. Docker
+## Build and install
 
-`docker --version` works **without sudo** (your user is in the `docker` group).
-
-### B. Host Claude Code
-
-Install Claude Code on the host (the **native installer** layout, under
-`~/.local/share/claude/`) and complete the subscription login so
-`~/.claude/.credentials.json` exists. ccbox **mounts your host `claude` binary** into the box,
-so the box always runs your exact host version — there is nothing to install or update inside
-the box. (Headless Linux stores creds in `~/.claude/.credentials.json`. If your system uses a
-keyring instead, use the `ANTHROPIC_API_KEY` fallback — see Troubleshooting.)
-
-### C. sysbox-ce (enables safe inner Docker)
-
-1. Ensure standard rootful Docker is running and your kernel is ≥ 5.12 (gives ID-mapped
-   mounts; check with `uname -r`).
-2. Download the latest `sysbox-ce` `.deb` for your distro/arch from
-   <https://github.com/nestybox/sysbox/releases>.
-3. Install:
-
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y ./sysbox-ce_*.deb
-   ```
-
-   The installer registers the `sysbox-runc` runtime with Docker and restarts the daemon.
-4. Verify:
-
-   ```bash
-   docker info -f '{{.Runtimes}}'   # must list sysbox-runc
-   ```
-
----
-
-## Install
-
-ccbox is part of the [cctools](../../README.md) bundle (Linux/amd64 only):
+Enable ccbox from the [cctools](../../README.md) suite, then build its image:
 
 ```bash
-cctools enable ccbox      # symlinks the 'ccbox' command into ~/.local/bin
-ccbox doctor              # check prerequisites (Docker, sysbox-ce, host claude, login)
-ccbox build               # build the container image, mirroring your user (~5 min, ~5GB)
+cctools enable ccbox
+ccbox doctor
+ccbox build
 ```
 
-The `ccbox` command is a symlink into the bundle clone; `ccbox build` finds the
-`Dockerfile` next to the script. The 5 GB image is built locally by `ccbox build`
-(so it mirrors your username/UID/GID/home) and is never shipped.
+The local image defaults to `ccbox:latest` and is built for the current username,
+UID, GID, and home path. Use `CCBOX_IMAGE` for another image name or
+`CCBOX_SHARE_DIR` for another directory containing the Dockerfile. A typical
+build takes about five minutes and uses about 5 GB.
 
-**Toolchains baked in:** Node 24 LTS, Python 3 + `uv`, Go 1.26.x, Rust (stable), .NET 10 LTS,
-plus `git`, `gh`, `jq`, `ripgrep`, `fd`, `openssl`, `socat`, and an inner Docker Engine +
-Compose v2. (`claude` itself is **not** baked in — it's mounted from the host.) Versions are
-`ARG`s in the `Dockerfile`; override with `--build-arg NODE_MAJOR=…` etc.
-
-## Uninstall
-
-```bash
-ccbox uninstall          # removes the image + caches; PROMPTS before data volumes
-cctools disable ccbox    # removes the 'ccbox' command symlink
-```
-
-`ccbox uninstall` never deletes your per-project database volumes (`ccbox-docker-*`)
-without an explicit yes. Run it **before** `cctools uninstall` — the bundle
-uninstaller never touches Docker data. (If you used ccbox 1.x, it also offers to
-remove the now-unused `~/.config/ccbox` GitHub App config.)
-
----
+The image contains Node 24, Python 3 with `uv`, Go 1.26.x, stable Rust, .NET 10,
+Git, GitHub CLI, jq, ripgrep, fd, OpenSSL, socat, and Docker with Compose. Claude
+Code is mounted from the host instead of installed in the image.
 
 ## Usage
 
-From inside a git repository (or any other directory — you'll be warned first, since there's
-no git history to undo the agent's edits there):
-
 ```bash
 cd ~/code/my-project
-ccbox
+ccbox                  # start Claude Code in the container
+ccbox --model opus     # pass arguments to Claude Code
+ccbox doctor
+ccbox version
 ```
 
-You land in the normal Claude Code chat — but every shell action runs **without a permission
-prompt**, inside the sandbox, against your live-mounted repo. Because the box mirrors your
-real paths, the agent's **memories and session history land in the same project bucket as your
-host** (`~/.claude/projects/<real-repo-path>/`), and your **plugins load exactly as on the
-host**.
+The first argument `build`, `doctor`, `uninstall`, `help`, or `version` selects a
+ccbox command. Other arguments pass to Claude Code after
+`--dangerously-skip-permissions`.
 
-- **Pass args straight through to Claude:** `ccbox --model opus`
-- **Commits are authored as you** (from `~/.gitconfig`); **pushes don't work** in the box (no
-  GitHub creds) — push from the host.
-- **Quick, no-Docker session** (skips starting the inner daemon, faster startup):
-  `CCBOX_NO_DOCKER=1 ccbox`
-- **Spot a sandbox session at a glance:** the terminal background is tinted for the session
-  (override `CCBOX_TINT`, disable `CCBOX_NO_TINT=1`); `CCBOX=1` is also exported for scripts.
-- **Inside the box, the inner Docker daemon starts in the background.** Before your first
-  `docker` / `docker compose` call, wait a few seconds for it to come up:
+Set `CCBOX_NO_DOCKER=1` for faster startup without inner Docker. ccbox tints the
+terminal while it runs; set `CCBOX_TINT` to change the color or
+`CCBOX_NO_TINT=1` to disable it. The container receives `CCBOX=1` and
+`CCBOX_VERSION`.
 
-  ```bash
-  until docker info >/dev/null 2>&1; do sleep 1; done
-  docker compose up -d
-  ```
+## Ports, caches, and inner Docker
 
-### Ports (host browser → in-box app)
-
-A default range (`3000-3010`) is published. Add more per session with `CCBOX_PORTS` (space
-separated) or per repo via `<repo>/.ccbox/ports` (one port/range per line):
+Ports `3000-3010` are published by default. Add ports with `CCBOX_PORTS`, or put
+one port or range per line in `<project>/.ccbox/ports`:
 
 ```bash
 CCBOX_PORTS="8080 5173" ccbox
 ```
 
-The in-box service must bind `0.0.0.0` (compose default), then open `http://localhost:<port>`
-in your host browser.
+Services must listen on `0.0.0.0`. The inner Docker daemon starts in the
+background; wait until `docker info` succeeds before the first Docker command.
 
----
+Shared cache volumes are `ccbox-npm`, `ccbox-cargo`, `ccbox-go`, `ccbox-uv`, and
+`ccbox-nuget`. Inner Docker uses `ccbox-docker-<project>`.
+
+## Uninstall
+
+```bash
+ccbox uninstall        # remove the image and shared caches; ask before project volumes
+cctools disable ccbox  # remove the command link
+```
+
+Run `ccbox uninstall` before `cctools uninstall` when you also want Docker data
+removed. Project volumes are deleted only after confirmation. The command may
+also offer to remove obsolete `~/.config/ccbox` files from ccbox 1.x.
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---|---|
-| Claude asks you to log in instead of using mounted creds | Ensure `~/.claude/.credentials.json` exists (Prereq B) and is writable. If your host stores creds in a keyring, run with `ANTHROPIC_API_KEY=… ccbox`. |
-| `host 'claude' not found on PATH` | Install Claude Code on the host (Prereq B); confirm `command -v claude` works. |
-| `host claude … isn't under ~/.local/share/claude` | You installed `claude` via npm-global, which this mount doesn't support. Use the native installer, or open an issue. |
-| Files created in the box are owned by the wrong UID | Rebuild so the image mirrors your account: `ccbox build` (passes your username/UID/GID/home). |
-| `ccbox: sysbox runtime not found` | Install sysbox-ce (Prereq C); verify with `docker info -f '{{.Runtimes}}'`. |
-| `docker` / `docker compose` "cannot connect" right after launch | The inner daemon is still starting — wait (see Usage). |
-| In-box web app unreachable from host browser | The service must bind `0.0.0.0` and its port must be published (see Ports). |
-| `ccbox` warns the directory is not a git repository | Expected outside a repo: there's no git history to undo the agent's edits. Press `y` to continue (the whole dir is mounted read-write), or `cd` into a git repo. |
+| Problem | Fix |
+| --- | --- |
+| `sysbox runtime not found` | Install sysbox-ce and confirm Docker lists `sysbox-runc`. |
+| Host `claude` is missing | Install Claude Code and confirm `command -v claude`. |
+| Host Claude layout is unsupported | Replace an npm-global installation with the native installer. |
+| Claude asks you to log in | Make sure `~/.claude/.credentials.json` is writable, or pass `ANTHROPIC_API_KEY`. |
+| Files have the wrong owner | Run `ccbox build` again for the current UID and GID. |
+| Image is missing | Run `ccbox build` or accept the build prompt. |
+| Inner Docker is not ready | Wait for `docker info`, or use `CCBOX_NO_DOCKER=1`. |
+| A host browser cannot reach a service | Bind the service to `0.0.0.0` and publish its port. |
+| The non-Git warning appears | Continue only if you accept having no Git undo, or run from a repository. |
 
----
-
-## Architecture notes
-
-- **Image:** Debian bookworm + language toolchains + inner Docker. `claude`, your config,
-  plugins, and memories all come **live from the host** at run time — the image carries none
-  of them, so there is no version skew and nothing to update inside the box.
-- **`amd64` assumed.** The host native-installer `claude` binary is amd64; on `arm64` you'd
-  also need to adjust the Go tarball arch (Node/Docker/.NET handle arm64 via their repos).
-- **Native-installer layout assumed** for `claude` (`~/.local/share/claude/versions/<v>`); an
-  npm-global install isn't mountable this way.
-- See [`docs/superpowers/specs/2026-06-22-ccbox-redesign-design.md`](docs/superpowers/specs/2026-06-22-ccbox-redesign-design.md)
-  for the full design rationale and threat model.
+See the [approved redesign document](docs/superpowers/specs/2026-06-22-ccbox-redesign-design.md)
+for the original design decisions and test results.

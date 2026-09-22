@@ -1,20 +1,17 @@
 # Changelog — ccbox
 
-All notable changes to ccbox are documented here. Versions follow [semver](https://semver.org).
+Notable changes to ccbox. Releases follow [Semantic Versioning](https://semver.org).
 
 ## 1.1.0 — 2026-06-26
 
-- `ccbox` no longer hard-errors outside a git repository. It now warns that there's
-  no git history to undo the agent's edits and prompts before launching, mounting the
-  current directory. A non-interactive launch (no controlling TTY) defaults to abort.
-  Inside a git repo the behaviour is unchanged (mounts the repo root, no prompt).
+- Allow use outside a Git repository after warning that edits have no Git undo.
+- Ask for confirmation before mounting a non-Git directory; abort by default
+  without a controlling terminal.
 
 ## 1.0.0 — 2026-06-24
 
-- Initial release in the cctools bundle (fresh `1.0.0` baseline alongside cchat
-  and ccsession). Sandboxed autonomous Claude Code: a path-identical host mirror
-  that runs the host's own `claude` binary read-only inside a sysbox container.
-- Distribution moves from a standalone `.deb` to the bundle installer +
-  `cctools enable ccbox`; `ccbox uninstall` teardown now points at
-  `cctools disable ccbox`, and `ccbox version` reads `CCBOX_VERSION` from
-  `bin/ccbox` (kept in sync with this tool's `VERSION` file).
+- Add autonomous Claude Code in a sysbox container, with the project and Claude
+  state mounted at their host paths and the host Claude installation read-only.
+- Move distribution from a standalone `.deb` to `cctools enable ccbox`.
+- Add `ccbox uninstall` guidance and read the displayed version from
+  `CCBOX_VERSION` in `bin/ccbox`.

@@ -1,23 +1,23 @@
 # harness-tools
 
-Small terminal helpers for **Claude Code, Codex, and Pi**. One development home,
-shared lifecycle infrastructure, three independently installable suites.
+Small terminal tools for **Claude Code, Codex, and Pi**. Each harness has an
+independently installable suite; all three share installation and maintenance code.
 
 | Purpose | Claude Code | Codex | Pi |
 | :--- | :---: | :---: | :---: |
-| Throwaway chat in a fresh temporary directory | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cctools/tools/cchat/assets/icon-dark.svg"><img src="suites/cctools/tools/cchat/assets/icon.svg" alt="" width="32" height="32"></picture><br>[cchat](suites/cctools/tools/cchat/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cotools/tools/cochat/assets/icon-dark.svg"><img src="suites/cotools/tools/cochat/assets/icon.svg" alt="" width="32" height="32"></picture><br>[cochat](suites/cotools/tools/cochat/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/pitools/tools/pichat/assets/icon-dark.svg"><img src="suites/pitools/tools/pichat/assets/icon.svg" alt="" width="32" height="32"></picture><br>[pichat](suites/pitools/tools/pichat/README.md) |
+| Temporary chat outside a project | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cctools/tools/cchat/assets/icon-dark.svg"><img src="suites/cctools/tools/cchat/assets/icon.svg" alt="" width="32" height="32"></picture><br>[cchat](suites/cctools/tools/cchat/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cotools/tools/cochat/assets/icon-dark.svg"><img src="suites/cotools/tools/cochat/assets/icon.svg" alt="" width="32" height="32"></picture><br>[cochat](suites/cotools/tools/cochat/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/pitools/tools/pichat/assets/icon-dark.svg"><img src="suites/pitools/tools/pichat/assets/icon.svg" alt="" width="32" height="32"></picture><br>[pichat](suites/pitools/tools/pichat/README.md) |
 | Find and resume sessions with fzf | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cctools/tools/ccsession/assets/icon-dark.svg"><img src="suites/cctools/tools/ccsession/assets/icon.svg" alt="" width="32" height="32"></picture><br>[ccsession](suites/cctools/tools/ccsession/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cotools/tools/cosession/assets/icon-dark.svg"><img src="suites/cotools/tools/cosession/assets/icon.svg" alt="" width="32" height="32"></picture><br>[cosession](suites/cotools/tools/cosession/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/pitools/tools/pisession/assets/icon-dark.svg"><img src="suites/pitools/tools/pisession/assets/icon.svg" alt="" width="32" height="32"></picture><br>[pisession](suites/pitools/tools/pisession/README.md) |
-| Path-identical Docker + sysbox sandbox | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cctools/tools/ccbox/assets/icon-dark.svg"><img src="suites/cctools/tools/ccbox/assets/icon.svg" alt="" width="32" height="32"></picture><br>[ccbox](suites/cctools/tools/ccbox/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cotools/tools/cobox/assets/icon-dark.svg"><img src="suites/cotools/tools/cobox/assets/icon.svg" alt="" width="32" height="32"></picture><br>[cobox](suites/cotools/tools/cobox/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/pitools/tools/pibox/assets/icon-dark.svg"><img src="suites/pitools/tools/pibox/assets/icon.svg" alt="" width="32" height="32"></picture><br>[pibox](suites/pitools/tools/pibox/README.md) |
+| Autonomous work in an isolated container | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cctools/tools/ccbox/assets/icon-dark.svg"><img src="suites/cctools/tools/ccbox/assets/icon.svg" alt="" width="32" height="32"></picture><br>[ccbox](suites/cctools/tools/ccbox/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/cotools/tools/cobox/assets/icon-dark.svg"><img src="suites/cotools/tools/cobox/assets/icon.svg" alt="" width="32" height="32"></picture><br>[cobox](suites/cotools/tools/cobox/README.md) | <picture><source media="(prefers-color-scheme: dark)" srcset="suites/pitools/tools/pibox/assets/icon-dark.svg"><img src="suites/pitools/tools/pibox/assets/icon.svg" alt="" width="32" height="32"></picture><br>[pibox](suites/pitools/tools/pibox/README.md) |
 | Manage installed tools | [cctools](suites/cctools/README.md) | [cotools](suites/cotools/README.md) | [pitools](suites/pitools/README.md) |
 
-Chat/session tools support Linux and macOS. Boxes require Linux amd64, Docker,
-sysbox, and a separately built image. Installing a session picker never builds
-an image or installs a harness.
+Chat tools and the Codex/Pi session pickers support Linux and macOS. `ccsession`
+also requires GNU `find`, `grep`, `date`, and `stat`. Box tools require Linux
+amd64, Docker, sysbox, and a locally built image. Installing another tool never
+builds that image.
 
 ## Install
 
-Requires **Bash, Git, and curl**. No GitHub account, sudo, or pre-existing checkout
-is needed. Choose a suite:
+Requires **Bash, Git, and curl**. No GitHub account or sudo is needed. Choose one suite:
 
 ```bash
 # Claude Code
@@ -30,11 +30,12 @@ curl -fsSL https://raw.githubusercontent.com/plabanauskis/harness-tools/main/ins
 curl -fsSL https://raw.githubusercontent.com/plabanauskis/harness-tools/main/install.sh | bash -s -- --suite=pitools
 ```
 
-The installer prompts for tools when a terminal is available. To install only
-specific tools, append e.g. `--tools=pichat,pisession` to the Pi command. `--all`
-selects every tool in the chosen suite; it never builds a Docker image.
+The installer shows a tool picker when a terminal is available. Use
+`--tools=pichat,pisession` to select tools directly or `--all` for the entire
+suite. `--force` keeps requested command links even when a dependency or platform
+check fails.
 
-Prefer to inspect the installer first (recommended):
+To inspect the installer before running it:
 
 ```bash
 curl -fsSL -o install.sh https://raw.githubusercontent.com/plabanauskis/harness-tools/main/install.sh
@@ -42,11 +43,7 @@ less install.sh
 bash install.sh --suite=pitools --tools=pichat,pisession
 ```
 
-A standalone or piped installer loads its shared implementation from a temporary
-Git checkout, installs the managed clone, then removes the temporary checkout.
-Running from a complete source checkout reuses that checkout's installer code.
-
-For local development, install from your committed checkout instead:
+For development, install committed files from a local clone:
 
 ```bash
 git clone https://github.com/plabanauskis/harness-tools.git
@@ -54,120 +51,84 @@ cd harness-tools
 PITOOLS_REPO="file://$PWD" bash install.sh --suite=pitools --tools=pichat
 ```
 
-This installs committed files, not uncommitted working-tree edits. The installed
-clone's upstream is then your local repository; updates require that path to
-remain available. For a non-`main` branch, also set `PITOOLS_BRANCH`.
+Set `PITOOLS_BRANCH` when using a branch other than `main`. Replace the `PI`
+prefix for the other suites. The local path must remain available for updates.
 
-Existing legacy installation? Follow [the migration guide](docs/migration.md)
-first. The new installer refuses to overwrite an unmanaged or legacy directory.
-
-### Selection and configuration
-
-- `--suite=cctools|cotools|pitools` is required by the root installer.
-- `--tools=a,b` enables only those tools; `--all` selects the whole chosen suite.
-- No selection: interactive picker with a TTY, otherwise eligible tools only.
-- `--force` allows links despite missing dependencies/platform support.
-- From a complete checkout, suite-specific entrypoints remain available:
-  `bash suites/pitools/install.sh`. Use the root URL above for standalone downloads.
-
-| Suite | Clone prefix override | Bin directory override | Upstream overrides |
+| Suite | Install directory | Bin directory | Source settings |
 | --- | --- | --- | --- |
 | cctools | `CCTOOLS_HOME` | `CCTOOLS_BIN` | `CCTOOLS_REPO`, `CCTOOLS_BRANCH` |
 | cotools | `COTOOLS_HOME` | `COTOOLS_BIN` | `COTOOLS_REPO`, `COTOOLS_BRANCH` |
 | pitools | `PITOOLS_HOME` | `PITOOLS_BIN` | `PITOOLS_REPO`, `PITOOLS_BRANCH` |
 
-Defaults are `~/.local/share/<suite>`, `~/.local/bin`, this repository, and `main`.
-Each prefix contains a complete monorepo clone and an ignored ownership marker
-`.agent-tools-suite`. This marker retains its old name so existing installations
-remain compatible after the repository rename. Prefixes must remain separate.
-There is no independently installed shared core or cross-prefix runtime dependency.
-See [repository rename guidance](docs/migration.md#repository-rename) for existing clones.
+Defaults are `~/.local/share/<suite>`, `~/.local/bin`, this repository, and
+`main`. Each install directory contains a full repository clone and the legacy
+`.agent-tools-suite` ownership marker. Keep suite install directories separate
+and keep custom directory settings in your shell environment.
 
-Keep custom `*_HOME`/`*_BIN` settings in your shell environment when using
-management commands. Existing harness-specific state/configuration variables
-are unchanged. Selecting a new `*_REPO` or `*_BRANCH` applies to a fresh install;
-existing managed clones update their configured Git upstream.
+Existing installation from an older repository? Read the [migration guide](docs/migration.md).
 
 ## Manage tools
 
 ```bash
 pitools list
 pitools doctor
-pitools enable pibox       # only links it; building the image is separate
+pitools enable pibox       # links the command; does not build the image
 pitools disable pichat
 pitools update
 pitools version
-pitools uninstall         # prompts; removes only owned links and this prefix
+pitools uninstall
 ```
 
-Replace `pitools` with `cctools` or `cotools` for the other suites. Update fetches
-and resets a clean installer-managed clone to its upstream (including rewritten
-upstream history), refusing staged or unstaged tracked edits. Do not use an
-installed prefix for development or local commits. Update/uninstall refuse a
-development checkout or another suite's prefix.
+Use `cctools` or `cotools` for the other suites. `update` refuses tracked local
+changes, then resets the managed clone to its configured source. Do not develop
+inside an installed clone.
 
-Uninstall does not delete sessions, credentials, projects, Docker images, or
-volumes. Use a box's own `uninstall` command **only** when you want its runtime
-artifacts removed; check that tool's documentation for data-preservation options.
+Suite uninstall removes only owned links and the managed clone. It does not
+remove sessions, credentials, projects, Docker images, or volumes. Use the box
+command's own `uninstall` subcommand to remove its Docker data.
 
-## Architecture
+## Repository layout
 
 ```text
-bin/                  shared manager entrypoint + suite-name symlinks
-lib/                  common manifests, installer, manager, release functions
-scripts/              unified checks, developer setup, per-tool release entrypoint
-suites/<suite>/        small compatibility entrypoints, suite docs and tests
-  tools/<tool>/       harness-specific scripts, manifests, versions, assets, docs
-docker/               shared Codex/Pi Dockerfile (suite paths link here)
-tests/                cross-suite lifecycle and repository contracts
+bin/                  shared manager and suite command links
+lib/                  shared installer, manager, and release code
+scripts/              checks, development setup, and releases
+suites/<suite>/        suite entrypoints, documentation, and tests
+  tools/<tool>/        tool scripts, manifests, versions, assets, and docs
+docker/               shared Codex/Pi Dockerfile
+tests/                shared installation and management tests
 ```
 
-Shared changes land once and are tested against all suites. Harness session
-parsers, session-picker implementations, launch arguments, authentication,
-container mounts, and state/volume names remain separate in this first
-consolidation. The tiny chat scripts remain standalone. Further session UI or
-container helper extraction can happen independently, without a big rewrite.
+Harness-specific parsers, launch arguments, authentication, mounts, and stored
+data remain separate. Codex and Pi share a Dockerfile but use separate images,
+entrypoints, credentials, and volumes. Claude uses its own image.
 
-The Claude image retains its distinct recipe. The Codex/Pi recipe is shared,
-but their images, entrypoints, credentials and Docker volumes are not merged.
-Read each box's security model before use: host project and harness state mounts
-are writable; a container is not a guarantee against all harmful actions.
+Read a box tool's safety section before use. Its project and harness-state mounts
+are writable, and containers do not protect against every possible harmful action.
 
-## Development
+## Development and releases
 
 ```bash
-scripts/check.sh          # shell syntax, shellcheck, shfmt, all existing + shared tests
-scripts/dev-setup.sh      # optional: enable the root pre-push check hook
-AGENT_TOOLS_SMOKE=1 scripts/check.sh  # opt into live smoke only when runtime/images exist
+scripts/check.sh
+scripts/dev-setup.sh      # optional pre-push check hook
+AGENT_TOOLS_SMOKE=1 scripts/check.sh
 ```
 
-Checks require Bash, Git, jq, shellcheck, shfmt, ripgrep, ImageMagick, and xmllint.
-On Debian/Ubuntu, the last two are provided by `imagemagick` and `libxml2-utils`.
-Tests use temporary repositories and fake harness/container commands. Live
-Docker smoke is explicitly opt-in and never builds an image automatically.
-The `AGENT_TOOLS_SMOKE` switch retains its established name for compatibility.
+Checks require Bash, Git, jq, shellcheck, shfmt, ripgrep, ImageMagick, and
+xmllint. Debian and Ubuntu provide the last two through `imagemagick` and
+`libxml2-utils`. Live Docker tests run only when `AGENT_TOOLS_SMOKE=1`; checks
+never build an image automatically.
 
-Release tools independently:
-
-```bash
-scripts/release.sh pichat 1.1.0
-```
-
-The helper requires a clean tree, updates the tool's version/changelog (and an
-embedded box version when applicable), commits, and creates `<tool>-vX.Y.Z`.
-Complete the generated changelog TODO before publication: amend the local
-commit, then recreate the **unpublished** tag at that commit. Do not rewrite
-published tags. `--gh` explicitly pushes and creates a **draft** GitHub release;
-finish its notes before publishing. Shared-core changes should be included in
-the changelogs/releases of every affected tool; a tag identifies a whole,
-self-contained monorepo revision.
+Release one tool with `scripts/release.sh <tool> <version>`. The script requires
+a clean tree, updates version files and the changelog, commits, and creates a
+`<tool>-vX.Y.Z` tag. Replace the generated changelog placeholder before publishing.
+The optional `--gh` flag pushes and creates a draft GitHub release.
 
 ## History and license
 
-All three original Git histories were imported without rewriting their commits.
-The original `ccbox-v1.1.0` tag still points to the original pre-monorepo layout.
-See [migration and provenance](docs/migration.md) for exact import commits.
+The three original repositories were imported with their histories intact. See
+[migration and provenance](docs/migration.md) for import commits and rename details.
 
-[MIT](LICENSE). Original attribution is preserved in each suite's license.
-Box design includes work adapted from [RchGrav/claudebox](https://github.com/RchGrav/claudebox).
-This project is independent of the harness vendors and maintainers.
+[MIT](LICENSE). Box code includes work adapted from
+[RchGrav/claudebox](https://github.com/RchGrav/claudebox). This project is
+independent of the harness vendors and maintainers.

@@ -5,76 +5,49 @@
   <img src="assets/logo.svg" alt="ccsession" width="400">
 </picture>
 
-<p><strong>Find and resume any Claude Code session — no <code>cd</code> required.</strong></p>
-
-<p>
-  Every Claude Code session, newest-active first, in one <code>fzf</code> picker — status, time,
-  directory, branch, and summary at a glance. Press Enter and it drops into the session's own
-  directory and resumes it for you.
-</p>
+<p><strong>Find and resume Claude Code sessions without changing directories first.</strong></p>
 
 <p>
   <a href="../../LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-555"></a>
-  <a href="https://github.com/plabanauskis/harness-tools/releases"><img alt="Latest release: 1.0.0" src="https://img.shields.io/badge/release-1.0.0-D97757"></a>
   <img alt="Platform: Linux · macOS" src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS-555">
   <img alt="Built for Claude Code" src="https://img.shields.io/badge/built%20for-Claude%20Code-D97757">
 </p>
 
 </div>
 
-List every Claude Code session in an [`fzf`](https://github.com/junegunn/fzf)
-picker and resume any one of them without first navigating to its directory.
+`ccsession` lists saved Claude Code sessions in an
+[`fzf`](https://github.com/junegunn/fzf) picker, newest first. Selecting a live
+session changes to its original directory and runs `claude --resume <id>`.
 
-Today, resuming a session means `cd`-ing to the right project directory and
-running `claude --resume`. `ccsession` replaces that with a single command: it
-lists all sessions newest-active-first — status, when, directory, branch, and
-summary at a glance — and on Enter `cd`s into the chosen session's original
-directory and runs `claude --resume <id>` there.
+## Picker
 
-## What it looks like
-
-```
+```text
   ccsession · 47 sessions · ↑↓ select · / filter · ⏎ resume
 
   ●  WHEN        DIRECTORY                               BRANCH    SUMMARY
   ─  ──────────  ──────────────────────────────────────  ────────  ──────────────────────────────
-  ●  4m ago      ~/source/github/octocat/dashboard       main      Add CSV export to the reports page
-  ●  7h ago      ~/Downloads/terraform-demo              —         Set up a Terraform demo environment
-  ✗  8h ago      ~/…/octocat/dashboard                   main      Fix flaky end-to-end checkout tests
-  ●  8h ago      /tmp/cchat.Xa9f2K                       —         Prototype a Redis caching layer
-  ●  yesterday   ~/source/github/octocat/cli             master    Pull the latest changes
+  ●  4m ago      ~/source/github/octocat/dashboard       main      Add CSV export to reports
+  ●  7h ago      /tmp/cchat.Xa9f2K                       —         Try a parsing approach
+  ✗  yesterday   ~/…/old-project                         main      Fix checkout tests
 ```
 
-Highlighting a row shows a boxed preview card on the right:
-
-```
-┌─ session ──────────────────────────────────────┐
-│ ● live                                         │
-│                                                │
-│ dir      ~/…/octocat/dashboard                 │
-│ branch   main                                  │
-│ active   2026-06-23 15:58 · 4m ago             │
-│ id       3f1c8a40-6b2e-4d19-9c7a-1e5f0b8d2a64  │
-├────────────────────────────────────────────────┤
-│ Add CSV export to the reports page             │
-└────────────────────────────────────────────────┘
-```
+The preview shows status, directory, branch, active time, session ID, and
+summary. `●` means the original directory exists. `✗` means it is gone; the row
+remains visible but cannot be resumed.
 
 ## Requirements
 
-`fzf`, `jq`, GNU `find`/`grep`/`date`/`stat`, and `claude` on your `PATH`.
-(All standard on a typical Linux setup.)
+- `fzf`, `jq`, and `claude` on `PATH`
+- GNU `find`, `grep`, `date`, and `stat`
+- Linux, or macOS with GNU tools placed on `PATH`
 
 ## Install
 
-Part of the [cctools](../../README.md) bundle:
+Enable it from the [cctools](../../README.md) suite:
 
 ```bash
 cctools enable ccsession
 ```
-
-(or select it during the root `install.sh`). The command is a symlink into the
-bundle clone, so a `cctools update` is immediately live — no reinstall step.
 
 ## Usage
 
@@ -83,41 +56,28 @@ ccsession          # open the picker
 ccsession --help   # show help
 ```
 
-- Type to fuzzy-filter, ↑/↓ to move, Enter to resume, ESC to cancel.
-- Rows marked `✗` (dimmed) are sessions whose directory no longer exists —
-  e.g. ephemeral `/tmp/cchat.*` sessions after a reboot. They are shown for
-  reference but cannot be resumed (pressing Enter on one prints an error and
-  exits non-zero). Resuming requires the original directory because Claude
-  locates sessions by their directory-derived project path.
+Type to filter, use Up/Down to select, Enter to resume, or Escape to cancel.
 
-## How it works
+## Session discovery
 
-Sessions live at `~/.claude/projects/<encoded-dir>/<session-id>.jsonl`. For each
-file `ccsession` reads:
+Claude Code stores sessions at
+`~/.claude/projects/<encoded-directory>/<session-id>.jsonl`.
 
-| Field   | Source                                                       |
-|---------|--------------------------------------------------------------|
-| cwd     | first `"cwd"` value in the file                              |
-| branch  | first `"gitBranch"` value (detached `HEAD`/none shown as `—`) |
-| summary | latest `ai-title` record; else first user prompt; else id    |
-| id      | the `.jsonl` filename stem                                    |
-| active  | the file's mtime (drives sort order and "when")              |
-| status  | `live` if the cwd still exists, else `gone`                  |
+| Display field | Source |
+| --- | --- |
+| Directory | first `cwd` value |
+| Branch | first `gitBranch` value |
+| Summary | latest `ai-title`; otherwise first user prompt; otherwise ID |
+| Active | file modification time |
+| Status | whether the recorded directory exists |
 
-Columns are aligned by **character** count (not bytes) so the `●`/`✗`/`…`/`~`
-glyphs line up under a UTF-8 locale.
+Columns use character counts rather than byte counts so Unicode symbols align
+under a UTF-8 locale.
 
 ## Tests
 
+From the repository root:
+
 ```bash
-bash tests/ccsession.test.sh
+bash suites/cctools/tools/ccsession/tests/ccsession.test.sh
 ```
-
-A dependency-free bash suite that sources the script (it is written to be
-sourceable) and asserts on its pure functions against synthetic session
-fixtures.
-
-## Out of scope (v1)
-
-Deleting/renaming/archiving sessions, multi-select, opening a directory without
-resuming, and searching within session contents.
