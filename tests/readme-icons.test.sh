@@ -28,12 +28,16 @@ for row in 'cctools cchat ccsession ccbox' 'cotools cochat cosession cobox' 'pit
   read -r suite chat session box <<<"$row"
   for tool in "$chat" "$session" "$box"; do
     check_icon "$ROOT/README.md" "suites/$suite/tools/$tool/assets" 1
-    if ! grep -Fq "[$tool](suites/$suite/tools/$tool/README.md) <picture>" "$ROOT/README.md"; then
-      echo "FAIL: main README must place the $tool icon after its name" >&2
+    if ! grep -Fq "</picture><br>[$tool](suites/$suite/tools/$tool/README.md)" "$ROOT/README.md"; then
+      echo "FAIL: main README must place the $tool icon above its name" >&2
       exit 1
     fi
     # Suite landing pages retain both their prominent header and table icons.
     check_icon "$ROOT/suites/$suite/README.md" "tools/$tool/assets" 2
   done
 done
+if ! grep -Fq '| :--- | :---: | :---: | :---: |' "$ROOT/README.md"; then
+  echo 'FAIL: main README must center the three tool columns' >&2
+  exit 1
+fi
 printf '%d passed, 0 failed\n' "$PASS"
